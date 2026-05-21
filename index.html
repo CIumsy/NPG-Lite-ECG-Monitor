@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Cardiac Monitor - ECG Visualization</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
       --primary: #ff3838;
@@ -1002,6 +1002,7 @@
       // Fullscreen toggle button
       const fullscreenBtn = document.createElement("button");
       fullscreenBtn.classList.add("fullscreen-btn");
+      fullscreenBtn.setAttribute("aria-label", "Toggle fullscreen");
       fullscreenBtn.innerHTML = `
         <svg viewBox="0 0 24 24">
           <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
@@ -1279,6 +1280,9 @@
         disconnectBLE: async function () {
           try {
             if (this.device && this.device.gatt.connected) {
+              // Stop any active recording before disconnecting so data is
+              // flushed and the timer/UI are left in a consistent state.
+              if (this.isRecording) this.stopRecording();
               console.log("Disconnecting...");
               await this.device.gatt.disconnect();
               this.connected = false;
@@ -1361,30 +1365,38 @@
           });
           return this._db;
         },
-        // Append a batch of rows to IndexedDB directly (no worker)
-        flushRecordingData: async function () {
+        // Append a batch of rows to IndexedDB directly (no worker).
+        // Serialised via _writeQueue so concurrent flushes can't race on
+        // the read-modify-write and overwrite each other's data.
+        flushRecordingData: function () {
           if (!this.recordingData.length) return;
+          // Snapshot rows immediately (synchronous) so new samples can
+          // keep accumulating in recordingData while the DB write is pending.
           const rows = [...this.recordingData];
           this.recordingData = [];
-          try {
-            const db = await this.openRecordingDB();
-            const filename = this.recordingFilename;
-            const existing = await new Promise((res, rej) => {
-              const req = db.transaction('ECGRecordings', 'readonly')
-                .objectStore('ECGRecordings').get(filename);
-              req.onsuccess = () => res(req.result);
-              req.onerror = () => rej(req.error);
+          const filename = this.recordingFilename;
+          // Chain onto the existing queue — each flush waits for the previous.
+          this._writeQueue = (this._writeQueue || Promise.resolve())
+            .then(async () => {
+              try {
+                const db = await this.openRecordingDB();
+                const existing = await new Promise((res, rej) => {
+                  const req = db.transaction('ECGRecordings', 'readonly')
+                    .objectStore('ECGRecordings').get(filename);
+                  req.onsuccess = () => res(req.result);
+                  req.onerror = () => rej(req.error);
+                });
+                const record = existing
+                  ? { filename, content: [...existing.content, ...rows] }
+                  : { filename, content: rows };
+                await new Promise((res, rej) => {
+                  const req = db.transaction('ECGRecordings', 'readwrite')
+                    .objectStore('ECGRecordings').put(record);
+                  req.onsuccess = () => res();
+                  req.onerror = () => rej(req.error);
+                });
+              } catch (e) { console.error('IDB write failed:', e); }
             });
-            const record = existing
-              ? { filename, content: [...existing.content, ...rows] }
-              : { filename, content: rows };
-            await new Promise((res, rej) => {
-              const req = db.transaction('ECGRecordings', 'readwrite')
-                .objectStore('ECGRecordings').put(record);
-              req.onsuccess = () => res();
-              req.onerror = () => rej(req.error);
-            });
-          } catch (e) { console.error('IDB write failed:', e); }
         },
         // Start recording
         startRecording: function () {
