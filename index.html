@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Cardiac Monitor - ECG Visualization</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    :root {
+      --primary: #ff3838;
+      --primary-dark: #e02c39;
+      --secondary: #0f172a;
+      --text: #f1f5f9;
+      --background: #020617;
+      --panel-bg: #1e293b;
+      --graph-bg: #000000;
+      --overlay-bg: rgba(15, 23, 42, 0.85);
+      --success: #2ed573;
+      --button-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+      /* Button-specific tokens (dark mode) */
+      --btn-bg: #1e293b;
+      /* slate-800: subtle lift above graph black */
+      --btn-text: #f1f5f9;
+    }
+
+    [data-theme="light"] {
+      --primary: #ff3838;
+      --primary-dark: #e02c39;
+      --secondary: #e2e8f0;
+      --text: #0f172a;
+      --background: #ffffff;
+      --panel-bg: #e9ecef;
+      --graph-bg: #ffffff;
+      /* Overlay on white graph needs a dark tint to be readable */
+      --overlay-bg: rgba(51, 65, 85, 0.82);
+      /* Button-specific tokens (light mode) */
+      --btn-bg: #64748b;
+      /* slate-500: calm mid-grey, clearly visible on white */
+      --btn-text: #ffffff;
+    }
+
+    /* Base styles */
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      touch-action: manipulation;
+    }
+
+    /* Fullscreen canvas container */
+    .canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--graph-bg);
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: var(--graph-bg);
+    }
+
+    /* Overlay for timer and BPM */
+    .overlay-top {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      pointer-events: auto;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+
+    .overlay-metric {
+      background-color: var(--overlay-bg);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .overlay-bpm {
+      background-color: var(--overlay-bg);
+      padding: 8px 16px;
+      border-radius: 25px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .heart-icon {
+      width: 18px;
+      height: 18px;
+      background-color: var(--primary);
+      transform: rotate(45deg);
+      position: relative;
+      opacity: 0;
+    }
+
+    /* Heartbeat animation triggered on peak detection */
+    .heart-icon.beating {
+      animation: beat 0.3s ease;
+    }
+
+    @keyframes beat {
+      0% {
+        transform: scale(1) rotate(45deg);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.3) rotate(45deg);
+        opacity: 1;
+      }
+
+      100% {
+        transform: scale(1) rotate(45deg);
+        opacity: 1;
+      }
+    }
+
+    .heart-icon:before,
+    .heart-icon:after {
+      content: "";
+      width: 18px;
+      height: 18px;
+      background-color: var(--primary);
+      border-radius: 50%;
+      position: absolute;
+    }
+
+    .heart-icon:before {
+      top: -9px;
+      left: 0;
+    }
+
+    .heart-icon:after {
+      top: 0;
+      left: -9px;
+    }
+
+    /* Fullscreen toggle button */
+    .fullscreen-btn {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      background-color: var(--btn-bg);
+      border: none;
+      color: var(--btn-text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      z-index: 20;
+      opacity: 0.85;
+      transition: all 0.2s;
+      backdrop-filter: blur(5px);
+    }
+
+    .fullscreen-btn:hover {
+      opacity: 1;
+      background-color: var(--primary);
+      transform: scale(1.1);
+    }
+
+    .fullscreen-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* Controls overlay */
+    .controls-overlay {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+      z-index: 15;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+
+    /* Recording controls */
+    .recording-controls {
+      position: absolute;
+      top: 60px;
+      left: 15px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      pointer-events: auto;
+      z-index: 20;
+    }
+
+    .recording-timer {
+      background-color: var(--primary);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .recording-dot {
+      width: 8px;
+      height: 8px;
+      background-color: white;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      50% {
+        opacity: 1;
+      }
+
+      51%,
+      100% {
+        opacity: 0.3;
+      }
+    }
+
+    /* File manager modal */
+    /* === Recordings dropup === */
+    .recordings-dropup {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px;
+      min-width: 300px;
+      max-height: 280px;
+      overflow-y: auto;
+      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+      display: none;
+      z-index: 500;
+    }
+
+    .recordings-dropup.open {
+      display: block;
+    }
+
+    .recordings-dropup-header {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text);
+      opacity: 0.55;
+      padding: 4px 6px 8px;
+    }
+
+    .file-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.05);
+      margin-bottom: 6px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+
+    .file-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .file-name {
+      color: var(--text);
+      font-size: 0.8rem;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .file-action-btn {
+      background: var(--primary);
+      border: none;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .file-action-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .file-action-btn.delete {
+      background: #e74c3c;
+    }
+
+    .no-files {
+      text-align: center;
+      color: var(--text);
+      font-size: 0.82rem;
+      padding: 16px;
+      opacity: 0.5;
+    }
+
+    /* === Toast notification === */
+    .rec-toast {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      background: rgba(20, 20, 30, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-left: 3px solid #2ecc71;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #fff;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      /* Hidden via opacity+visibility so zero-width empty element
+         doesn't leak its border-left into the viewport */
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(-12px);
+      transition: opacity 0.35s ease, transform 0.35s ease,
+        visibility 0s linear 0.35s;
+      pointer-events: none;
+    }
+
+    .rec-toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+      transition: opacity 0.35s ease, transform 0.35s ease,
+        visibility 0s linear 0s;
+    }
+
+    .rec-toast strong {
+      color: #2ecc71;
+      display: block;
+      margin-bottom: 2px;
+      font-size: 0.88rem;
+    }
+
+    .btn.recording {
+      background-color: var(--primary);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .btn {
+      background-color: var(--btn-bg);
+      border: none;
+      color: var(--btn-text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+      box-shadow: var(--button-shadow);
+      min-width: 80px;
+      touch-action: manipulation;
+      position: relative;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: var(--primary);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Theme toggle & fullscreen-inside-fullscreen toggle */
+    .theme-toggle,
+    .fullscreen-theme-toggle {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--btn-bg);
+      color: var(--btn-text);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      z-index: 99999;
+      transition: all 0.3s;
+      touch-action: manipulation;
+    }
+
+    .theme-toggle:hover,
+    .fullscreen-theme-toggle:hover {
+      background-color: var(--primary);
+      color: #fff;
+      transform: scale(1.1);
+    }
+
+    .theme-toggle svg,
+    .fullscreen-theme-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .fullscreen-theme-toggle {
+      display: none;
+    }
+
+    .canvas-container.fullscreen .fullscreen-theme-toggle {
+      display: flex;
+    }
+
+    /* === Mobile layout === */
+    /* Portrait: 2×2 button grid */
+    @media (max-width: 480px) {
+      .overlay-top {
+        top: 10px;
+        gap: 6px;
+      }
+
+      .overlay-metric {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+      }
+
+      .overlay-bpm {
+        padding: 6px 12px;
+        font-size: 1rem;
+        gap: 6px;
+      }
+
+      .heart-icon {
+        width: 14px;
+        height: 14px;
+      }
+
+      .heart-icon:before,
+      .heart-icon:after {
+        width: 14px;
+        height: 14px;
+      }
+
+      .heart-icon:before {
+        top: -7px;
+      }
+
+      .heart-icon:after {
+        left: -7px;
+      }
+
+      .btn {
+        padding: 6px 10px;
+        font-size: 12px;
+        min-width: 0;
+        flex: 1 1 calc(50% - 6px);
+      }
+
+      .theme-toggle,
+      .fullscreen-theme-toggle {
+        width: 36px;
+        height: 36px;
+      }
+
+      .theme-toggle svg,
+      .fullscreen-theme-toggle svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .fullscreen-btn {
+        width: 32px;
+        height: 32px;
+        bottom: 10px;
+        right: 10px;
+      }
+
+      .fullscreen-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    @media (orientation: portrait) and (max-width: 600px) {
+      .fullscreen-btn {
+        bottom: 90px;
+      }
+
+      .controls-overlay {
+        bottom: 15px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        max-width: 320px;
+      }
+
+      /* Dropup: fixed so it can't clip off-screen */
+      .recordings-dropup {
+        position: fixed;
+        bottom: 100px;
+        left: 10px;
+        right: 10px;
+        min-width: unset;
+        max-height: 50vh;
+      }
+    }
+
+    /* Landscape: single row, no wrap */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .controls-overlay {
+        flex-wrap: nowrap;
+        bottom: 10px;
+        gap: 6px;
+      }
+
+      .btn {
+        padding: 5px 8px;
+        font-size: 11px;
+        min-width: 0;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .overlay-top {
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Fullscreen display container -->
+  <div id="deviceContainer"></div>
+
+  <!-- Theme toggle button using original icon -->
+  <button class="theme-toggle" aria-label="Toggle theme">
+    <svg viewBox="0 0 24 24">
+      <path
+        d="M12 18c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm-7-2c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm14 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM12 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm0 22c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm-9-9c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm18 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM5.6 4.6c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm0-12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm-12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0z" />
+    </svg>
+  </button>
+
+  <script src="webglplot.umd.js"></script>
+  <script>
+    const { WebglPlot, ColorRGBA, WebglLine } = WebglPlotBundle;
+
+    // === Filter Classes ===
+    class NotchFilter {
+      constructor() {
+        this.z1_1 = 0; this.z2_1 = 0;
+        this.z1_2 = 0; this.z2_2 = 0;
+      }
+      process(input) {
+        let output = input;
+        this.x_1 = output - (-1.56858163 * this.z1_1) - (0.96424138 * this.z2_1);
+        output = 0.96508099 * this.x_1 + (-1.56202714 * this.z1_1) + (0.96508099 * this.z2_1);
+        this.z2_1 = this.z1_1;
+        this.z1_1 = this.x_1;
+        this.x_2 = output - (-1.61100358 * this.z1_2) - (0.96592171 * this.z2_2);
+        output = 1.0 * this.x_2 + (-1.61854514 * this.z1_2) + (1.0 * this.z2_2);
+        this.z2_2 = this.z1_2;
+        this.z1_2 = this.x_2;
+        return output;
+      }
+    }
+    class ECGFilter {
+      constructor() { this.z1 = 0; this.z2 = 0; }
+      process(input) {
+        let output = input;
+        this.x1 = output - (-1.47548044 * this.z1) - (0.58691951 * this.z2);
+        output = 0.02785977 * this.x1 + (0.05571953 * this.z1) + (0.02785977 * this.z2);
+        this.z2 = this.z1; this.z1 = this.x1;
+        return output;
+      }
+    }
+
+    // BLE constants and parameters
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
+    const BLOCK_COUNT = 10;
+    const DEBOUNCE_TIME = 1000;
+    const NUM_POINTS = 2000;
+    const SAMPLE_RATE = 500;
+
+    // === Pan-Tompkins R-peak Detector (adapted for 500 Hz) ===
+    // Algorithm follows the firmware exactly; all timing constants are scaled
+    // by 4× (500 Hz / 125 Hz) from the reference firmware.
+    class PanTompkinsDetector {
+      constructor(fs) {
+        this.fs = fs;
+        const s = fs / 125;                         // scale factor = 4
+        this.MWI_WIN = Math.round(20 * s); // 80 samples  (~160 ms)
+        this.REFRACT = Math.round(25 * s); // 100 samples (~200 ms)
+        this.LEARN_N = fs * 2;             // 1000 samples (2 s) — fast calibration
+        this.R_BACK = Math.round(22 * s); // 88 samples
+        this.R_FWD = Math.round(3 * s); // 12 samples
+        this.TW_MIN = Math.round(25 * s); // 100 samples
+        this.TW_MAX = Math.round(45 * s); // 180 samples
+        this.TW_SLOPE_RATIO = 0.5;
+        this.RECOVER_MIN_GAP = Math.round(fs / 2); // 250 samples
+        this.NO_QRS_ABS = fs;                 // 500 samples
+        this.MW_BASE_ALPHA = 0.01;
+        this.DECAY_SPKI = 0.50;
+        this.ECG_HIST_LEN = Math.round(240 * s);// 960 samples
+
+        // ECG circular history (for R-peak localisation)
+        this.ecgHist = new Float64Array(this.ECG_HIST_LEN);
+        this.slopeHist = new Float64Array(this.ECG_HIST_LEN);
+        this.ecgTime = new Uint32Array(this.ECG_HIST_LEN);
+        this.ecgW = 0;
+
+        // 5-point derivative ring buffer
+        this.dBuf = new Float64Array(5);
+        this.dW = 0;
+
+        // Moving Window Integrator
+        this.mwiBuf = new Float64Array(this.MWI_WIN);
+        this.mwiW = 0;
+        this.mwiSum = 0;
+
+        // 3-point MWI peak tracker
+        this.m0 = 0; this.t0 = 0;
+        this.m1 = 0; this.t1 = 0;
+        this.m2 = 0; this.t2 = 0;
+
+        // Adaptive thresholds
+        this.SPKI = 0; this.NPKI = 0;
+        this.TH1 = 0; this.TH2 = 0;
+
+        // QRS state
+        this.lastQRS = 0;
+        this.lastQRSSlope = 0;
+
+        // RR interval history (8 beats)
+        this.rrBuf = new Float64Array(8);
+        this.rrW = 0; this.rrN = 0;
+        this.rrAvg = fs; // start at 1 s
+
+        // Searchback candidate
+        this.sbPeakVal = 0;
+        this.sbPeakTime = 0;
+
+        // Learning phase accumulators
+        this.learnCount = 0;
+        this.learnMax = 0;
+        this.learnSum = 0;
+
+        // Watchdog noise baseline
+        this.mwBaseInit = false;
+        this.mwBase = 0;
+        this.lastRecover = 0;
+
+        // BPM tracking (own rolling average, separate from RR)
+        this.bpmHist = new Float64Array(8);
+        this.bpmHW = 0; this.bpmHN = 0;
+        this.bpm = 0;
+        this.lastRTime = 0;
+
+        // Absolute sample counter
+        this.n = 0;
+      }
+
+      // Reset all state (call before each new streaming session)
+      reset() {
+        this.ecgHist.fill(0); this.slopeHist.fill(0); this.ecgTime.fill(0); this.ecgW = 0;
+        this.dBuf.fill(0); this.dW = 0;
+        this.mwiBuf.fill(0); this.mwiW = 0; this.mwiSum = 0;
+        this.m0 = 0; this.t0 = 0; this.m1 = 0; this.t1 = 0; this.m2 = 0; this.t2 = 0;
+        this.SPKI = 0; this.NPKI = 0; this.TH1 = 0; this.TH2 = 0;
+        this.lastQRS = 0; this.lastQRSSlope = 0;
+        this.rrBuf.fill(0); this.rrW = 0; this.rrN = 0; this.rrAvg = this.fs;
+        this.sbPeakVal = 0; this.sbPeakTime = 0;
+        this.learnCount = 0; this.learnMax = 0; this.learnSum = 0;
+        this.mwBaseInit = false; this.mwBase = 0; this.lastRecover = 0;
+        this.bpmHist.fill(0); this.bpmHW = 0; this.bpmHN = 0; this.bpm = 0; this.lastRTime = 0;
+        this.n = 0;
+      }
+
+      _deriv5(x) {
+        this.dBuf[this.dW] = x;
+        this.dW = (this.dW + 1) % 5;
+        const i = this.dW;
+        const xn2 = this.dBuf[(i + 3) % 5];
+        const xn1 = this.dBuf[(i + 4) % 5];
+        const xp1 = this.dBuf[(i + 1) % 5];
+        const xp2 = this.dBuf[(i + 2) % 5];
+        return (-xn2 - 2 * xn1 + 2 * xp1 + xp2) / 8.0;
+      }
+
+      _mwi(x) {
+        this.mwiSum -= this.mwiBuf[this.mwiW];
+        this.mwiBuf[this.mwiW] = x;
+        this.mwiSum += x;
+        this.mwiW = (this.mwiW + 1) % this.MWI_WIN;
+        return this.mwiSum / this.MWI_WIN;
+      }
+
+      _rrUpdate(rr) {
+        this.rrBuf[this.rrW] = rr;
+        this.rrW = (this.rrW + 1) & 7;
+        if (this.rrN < 8) this.rrN++;
+        let s = 0;
+        for (let i = 0; i < this.rrN; i++) s += this.rrBuf[i];
+        this.rrAvg = s / this.rrN;
+      }
+
+      _bpmUpdate(rTime) {
+        if (this.lastRTime === 0) { this.lastRTime = rTime; return; }
+        const rr = rTime - this.lastRTime;
+        this.lastRTime = rTime;
+        if (rr < 10 || rr > this.fs * 3) return;
+        this.bpmHist[this.bpmHW] = rr;
+        this.bpmHW = (this.bpmHW + 1) & 7;
+        if (this.bpmHN < 8) this.bpmHN++;
+        let sum = 0;
+        for (let i = 0; i < this.bpmHN; i++) sum += this.bpmHist[i];
+        this.bpm = (60 * this.fs) / (sum / this.bpmHN);
+      }
+
+      _slopeAround(timeCenter, halfWin) {
+        let best = 0;
+        for (let k = 0; k < this.ECG_HIST_LEN; k++) {
+          const idx = (this.ecgW + this.ECG_HIST_LEN - 1 - k) % this.ECG_HIST_LEN;
+          const dt = (this.ecgTime[idx] | 0) - (timeCenter | 0);
+          if (dt > halfWin) continue;
+          if (dt < -halfWin) break;
+          if (this.slopeHist[idx] > best) best = this.slopeHist[idx];
+        }
+        return best;
+      }
+
+      // Find the true R-peak location in ECG history near the MWI-detected QRS time.
+      // Searches for the maximum POSITIVE value (R-peaks are always the tallest
+      // positive deflection for standard ECG lead placement).
+      _findRpeak(qrsTime) {
+        let bestVal = -Infinity, bestSlope = -1, bestTime = 0;
+        for (let k = 0; k < this.ECG_HIST_LEN; k++) {
+          const idx = (this.ecgW + this.ECG_HIST_LEN - 1 - k) % this.ECG_HIST_LEN;
+          const dt = (this.ecgTime[idx] | 0) - (qrsTime | 0);
+          if (dt > this.R_FWD) continue;
+          if (dt < -this.R_BACK) break;
+          const v = this.ecgHist[idx]; // signed — we want max positive
+          const s = this.slopeHist[idx];
+          if (v > bestVal || (v === bestVal && s > bestSlope)) {
+            bestVal = v; bestSlope = s; bestTime = this.ecgTime[idx];
+          }
+        }
+        return bestTime > 0 ? bestTime : null;
+      }
+
+      _updateTH() {
+        this.TH1 = this.NPKI + 0.25 * (this.SPKI - this.NPKI);
+        this.TH2 = 0.40 * this.TH1;
+      }
+
+      _acceptQRS(peakTime) {
+        if (this.lastQRS !== 0) {
+          const dt = peakTime - this.lastQRS;
+          if (dt < this.REFRACT) return false;
+          if (dt >= this.TW_MIN && dt <= this.TW_MAX) {
+            const sNow = this._slopeAround(peakTime, 2);
+            if (this.lastQRSSlope > 0 && sNow < this.TW_SLOPE_RATIO * this.lastQRSSlope)
+              return false;
+          }
+          if (this.rrN >= 2 && (peakTime - this.lastQRS) < 0.30 * this.rrAvg)
+            return false;
+        }
+        return true;
+      }
+
+      _watchdog() {
+        if (this.n < this.LEARN_N || this.lastQRS === 0) return;
+        let blindLimit = Math.floor(1.5 * this.rrAvg);
+        if (blindLimit < this.NO_QRS_ABS) blindLimit = this.NO_QRS_ABS;
+        if ((this.n - this.lastQRS) <= blindLimit) return;
+        if ((this.n - this.lastRecover) < this.RECOVER_MIN_GAP) return;
+        this.lastRecover = this.n;
+        this.SPKI *= this.DECAY_SPKI;
+        this.NPKI = 0.90 * this.NPKI + 0.10 * this.mwBase;
+        if (this.NPKI < 1e-12) this.NPKI = 1e-12;
+        if (this.SPKI < this.NPKI) this.SPKI = this.NPKI;
+        this._updateTH();
+        this.sbPeakVal = 0; this.sbPeakTime = 0;
+      }
+
+      // Returns sample-time of R-peak or null
+      _handleMWIPeak(peakVal, peakTime) {
+        if (this.n < this.LEARN_N) {
+          this.learnCount++;
+          this.learnSum += peakVal;
+          if (peakVal > this.learnMax) this.learnMax = peakVal;
+          if (this.n === this.LEARN_N - 1) {
+            this.SPKI = this.learnMax;
+            this.NPKI = this.learnCount > 0
+              ? this.learnSum / this.learnCount
+              : 0.1 * this.learnMax;
+            this._updateTH();
+          }
+          return null;
+        }
+        const isQRS = peakVal >= this.TH1 && this._acceptQRS(peakTime);
+        if (!isQRS) {
+          this.NPKI = 0.125 * peakVal + 0.875 * this.NPKI;
+          this._updateTH();
+          if (peakVal > this.TH2 && peakVal > this.sbPeakVal) {
+            this.sbPeakVal = peakVal;
+            this.sbPeakTime = peakTime;
+          }
+          return null;
+        }
+        const rr = this.lastQRS === 0 ? this.rrAvg : (peakTime - this.lastQRS);
+        this.lastQRS = peakTime;
+        this._rrUpdate(rr);
+        this.lastQRSSlope = this._slopeAround(peakTime, 2);
+        this.SPKI = 0.125 * peakVal + 0.875 * this.SPKI;
+        this._updateTH();
+        this.sbPeakVal = 0; this.sbPeakTime = 0;
+        const rT = this._findRpeak(peakTime);
+        const rTime = rT !== null ? rT : peakTime;
+        this._bpmUpdate(rTime);
+        return rTime;
+      }
+
+      _searchback() {
+        if (this.n < this.LEARN_N || this.lastQRS === 0) return null;
+        if ((this.n - this.lastQRS) <= 1.66 * this.rrAvg) return null;
+        if (this.sbPeakTime !== 0 && this.sbPeakVal >= this.TH2 &&
+          this._acceptQRS(this.sbPeakTime)) {
+          const rr = this.sbPeakTime - this.lastQRS;
+          this.lastQRS = this.sbPeakTime;
+          this._rrUpdate(rr);
+          this.lastQRSSlope = this._slopeAround(this.sbPeakTime, 2);
+          this.SPKI = 0.125 * this.sbPeakVal + 0.875 * this.SPKI;
+          this._updateTH();
+          const rT = this._findRpeak(this.sbPeakTime);
+          const rTime = rT !== null ? rT : this.sbPeakTime;
+          this.sbPeakVal = 0; this.sbPeakTime = 0;
+          this._bpmUpdate(rTime);
+          return rTime;
+        }
+        this.sbPeakVal = 0; this.sbPeakTime = 0;
+        this.NPKI *= 0.95;
+        this._updateTH();
+        return null;
+      }
+
+      // Feed one filtered ECG sample; returns absolute sample-time of R-peak or null
+      process(ecgSample) {
+        const n = this.n;
+        const d = this._deriv5(ecgSample);
+        const slope = Math.abs(d);
+        const mw = this._mwi(d * d);
+
+        // Store ECG history for R-peak localisation
+        this.ecgHist[this.ecgW] = ecgSample;
+        this.slopeHist[this.ecgW] = slope;
+        this.ecgTime[this.ecgW] = n;
+        this.ecgW = (this.ecgW + 1) % this.ECG_HIST_LEN;
+
+        // Shift 3-point MWI window
+        this.m0 = this.m1; this.t0 = this.t1;
+        this.m1 = this.m2; this.t1 = this.t2;
+        this.m2 = mw; this.t2 = n;
+
+        // Watchdog baseline
+        if (n >= this.LEARN_N) {
+          if (!this.mwBaseInit) { this.mwBase = mw; this.mwBaseInit = true; }
+          if (mw < this.TH1)
+            this.mwBase = (1 - this.MW_BASE_ALPHA) * this.mwBase + this.MW_BASE_ALPHA * mw;
+          this._watchdog();
+        }
+
+        let rPeak = null;
+        if (n >= 2 && this.m1 > this.m0 && this.m1 >= this.m2)
+          rPeak = this._handleMWIPeak(this.m1, this.t1);
+        const sb = this._searchback();
+        if (sb !== null) rPeak = sb;
+
+        this.n++;
+        return rPeak; // absolute sample-time, or null
+      }
+    }
+
+    function createDevicePanel() {
+      // Create the full-screen canvas container
+      const canvasContainer = document.createElement("div");
+      canvasContainer.classList.add("canvas-container");
+      // Create canvas element
+      const canvas = document.createElement("canvas");
+      canvasContainer.appendChild(canvas);
+      // Create overlay container for overlays
+      const overlay = document.createElement("div");
+      overlay.classList.add("canvas-overlay");
+      // Combined top overlay for timer and BPM
+      const overlayTop = document.createElement("div");
+      overlayTop.classList.add("overlay-top");
+      const timeDisplay = document.createElement("div");
+      timeDisplay.classList.add("overlay-metric");
+      timeDisplay.textContent = "00:00";
+      const bpmDisplay = document.createElement("div");
+      bpmDisplay.classList.add("overlay-bpm");
+      const heartIcon = document.createElement("div");
+      heartIcon.classList.add("heart-icon");
+      bpmDisplay.appendChild(heartIcon);
+      const bpmText = document.createElement("span");
+      bpmText.textContent = "-- BPM";
+      bpmDisplay.appendChild(bpmText);
+      overlayTop.append(timeDisplay, bpmDisplay);
+      overlay.appendChild(overlayTop);
+      // Fullscreen theme toggle button
+      const fullscreenThemeToggle = document.createElement("button");
+      fullscreenThemeToggle.classList.add("fullscreen-theme-toggle");
+      fullscreenThemeToggle.setAttribute("aria-label", "Toggle theme in fullscreen");
+      fullscreenThemeToggle.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <path d="M12 18c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm-7-2c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm14 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM12 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm0 22c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm-9-9c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm18 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM5.6 4.6c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm0-12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm-12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0z"/>
+        </svg>
+      `;
+      overlay.appendChild(fullscreenThemeToggle);
+      // Fullscreen toggle button
+      const fullscreenBtn = document.createElement("button");
+      fullscreenBtn.classList.add("fullscreen-btn");
+      fullscreenBtn.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+      `;
+      fullscreenBtn.addEventListener("click", toggleFullscreen);
+      overlay.appendChild(fullscreenBtn);
+      // Controls overlay with merged Connect/Disconnect and Toggle Peaks button
+      const controlsOverlay = document.createElement("div");
+      controlsOverlay.classList.add("controls-overlay");
+      // Merged connect/disconnect button; clicking it will both connect and start streaming
+      const connectToggleBtn = document.createElement("button");
+      connectToggleBtn.textContent = "Connect";
+      connectToggleBtn.classList.add("btn");
+
+      // Record button wrapper with duration badge on top
+      const recordBtnWrapper = document.createElement("div");
+      recordBtnWrapper.style.cssText = 'position:relative;display:inline-block';
+
+      // Record button
+      const recordBtn = document.createElement("button");
+      recordBtn.textContent = "Record";
+      recordBtn.classList.add("btn");
+      recordBtn.disabled = true;
+      recordBtnWrapper.appendChild(recordBtn);
+
+      // Recordings button + dropup wrapper
+      const recordingsWrapper = document.createElement("div");
+      recordingsWrapper.style.position = "relative";
+      const fileManagerBtn = document.createElement("button");
+      fileManagerBtn.textContent = "Recordings";
+      fileManagerBtn.classList.add("btn");
+      // Dropup panel (session-only, no full-screen modal)
+      const dropup = document.createElement("div");
+      dropup.classList.add("recordings-dropup");
+      dropup.innerHTML = '<div class="recordings-dropup-header">This session</div><ul class="file-list"></ul>';
+      recordingsWrapper.appendChild(fileManagerBtn);
+      recordingsWrapper.appendChild(dropup);
+      // Close dropup when clicking outside
+      document.addEventListener("click", (e) => {
+        if (!recordingsWrapper.contains(e.target)) dropup.classList.remove("open");
+      });
+      // Toast notification element
+      const recToast = document.createElement("div");
+      recToast.classList.add("rec-toast");
+      document.body.appendChild(recToast);
+      let toastTimer = null;
+      function showToast(html) {
+        recToast.innerHTML = html;
+        recToast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => recToast.classList.remove("show"), 4500);
+      }
+      // Toggle Peaks button
+      const peaksToggleBtn = document.createElement("button");
+      peaksToggleBtn.textContent = "Hide Peaks";
+      peaksToggleBtn.classList.add("btn");
+      controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn);
+      overlay.appendChild(controlsOverlay);
+
+      // Recording timer overlay
+      const recordingControls = document.createElement("div");
+      recordingControls.classList.add("recording-controls");
+      recordingControls.style.display = "none";
+      const recordingTimer = document.createElement("div");
+      recordingTimer.classList.add("recording-timer");
+      recordingTimer.innerHTML = '<div class="recording-dot"></div><span>00:00:00</span>';
+      recordingControls.appendChild(recordingTimer);
+
+      overlay.appendChild(recordingControls);
+
+      canvasContainer.appendChild(overlay);
+
+      // (Full-screen modal removed — replaced by dropup above)
+
+      document.getElementById("deviceContainer").appendChild(canvasContainer);
+
+      async function toggleFullscreen() {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(err => { console.error("Error exiting fullscreen:", err); });
+          canvasContainer.classList.remove("fullscreen");
+          if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
+        } else {
+          try {
+            await canvasContainer.requestFullscreen();
+            canvasContainer.classList.add("fullscreen");
+            if (screen.orientation && screen.orientation.lock) { await screen.orientation.lock("landscape"); }
+          } catch (err) { console.error("Error entering fullscreen:", err); }
+        }
+      }
+
+      // Size the canvas backing buffer correctly.
+      // clientWidth/clientHeight are 0 here (layout not yet complete),
+      // so use window dimensions — the canvas is always fullscreen.
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+
+      // Keep the canvas sharp on window / orientation resize
+      const resizeObserver = new ResizeObserver(() => {
+        const newDpr = window.devicePixelRatio || 1;
+        const w = Math.round(canvasContainer.clientWidth * newDpr);
+        const h = Math.round(canvasContainer.clientHeight * newDpr);
+        if (w !== canvas.width || h !== canvas.height) {
+          canvas.width = w;
+          canvas.height = h;
+          // Reinitialise WebglPlot with the new size so it renders correctly
+          if (connection.wglp) {
+            connection.wglp = new WebglPlot(canvas);
+            if (connection.line0) connection.wglp.addLine(connection.line0);
+            if (connection.peakLine) connection.wglp.addLine(connection.peakLine);
+          }
+        }
+      });
+      resizeObserver.observe(canvasContainer);
+
+      // Create connection object
+      const connection = {
+        device: null,
+        server: null,
+        controlChar: null,
+        dataChar: null,
+        streaming: false,
+        connected: false,
+        canvas: canvas,
+        dataCh0: new Array(NUM_POINTS).fill(0),
+        sampleIndex: 0,
+        prevSampleCounter: null,
+        lastActionTime: 0,
+        wglp: null,
+        line0: null,
+        // Second line for peaks:
+        peakLine: null,
+        peakLineData: new Array(NUM_POINTS).fill(0),
+        startTime: null,
+        notch0: new NotchFilter(),
+        ecg0: new ECGFilter(),
+        lastBeatTime: 0,
+        beatDetected: false,
+        peaksVisible: true,
+        // Pan-Tompkins detector & per-sample peak flags
+        peakFlags: new Uint8Array(NUM_POINTS),
+        panTompkins: new PanTompkinsDetector(SAMPLE_RATE),
+        absN: 0, // absolute sample counter (mirrors panTompkins.n)
+        // Packet format — set dynamically after connect based on device name
+        singleSampleLen: 7,   // 3CH default: 2*3+1
+        newPacketLen: 70,     // 3CH default: 10*7
+        // Session recordings list (in-memory, for dropup)
+        sessionRecordings: [],
+        isRecording: false,
+        recordingStartTime: null,
+        recordingData: [],
+        recordingFilename: null,
+        recordingTimer: null,
+        worker: null,
+        recordingDurationLimit: null, // in milliseconds, null = unlimited
+        totalRecordedSamples: 0,
+
+        updateButtonStates: function () {
+          // Update merged connect/disconnect button text
+          connectToggleBtn.textContent = this.connected ? "Disconnect" : "Connect";
+          recordBtn.disabled = !this.connected;
+          recordBtn.textContent = this.isRecording ? "Stop Recording" : "Record";
+          if (this.isRecording) {
+            recordBtn.classList.add("recording");
+          } else {
+            recordBtn.classList.remove("recording");
+          }
+        },
+        normalizeSample: function (sample) {
+          const ADC_MAX = 4096;
+          return (sample - ADC_MAX / 2) * (2 / ADC_MAX);
+        },
+        processSample: function (dataView) {
+          if (dataView.byteLength !== this.singleSampleLen) return;
+          const sampleCounter = dataView.getUint8(0);
+          if (this.prevSampleCounter === null) {
+            this.prevSampleCounter = sampleCounter;
+          } else {
+            const expected = (this.prevSampleCounter + 1) % 256;
+            if (sampleCounter !== expected) {
+              console.log(`Missing sample: expected ${expected}, got ${sampleCounter}`);
+            }
+            this.prevSampleCounter = sampleCounter;
+          }
+          const writePos = this.sampleIndex; // position about to be overwritten
+          this.peakFlags[writePos] = 0;       // clear stale flag for this slot
+          const rawCh0 = dataView.getInt16(1, false);
+          let normCh0 = this.normalizeSample(Math.max(0, Math.min(4096, rawCh0)));
+          normCh0 = this.ecg0.process(this.notch0.process(normCh0));
+          this.dataCh0[writePos] = normCh0;
+          this.sampleIndex = (this.sampleIndex + 1) % NUM_POINTS;
+
+          // Pan-Tompkins detection (operates on the filtered sample)
+          const rTime = this.panTompkins.process(normCh0);
+          if (rTime !== null) {
+            this.peakFlags[rTime % NUM_POINTS] = 1;
+            this.triggerHeartbeat();
+          }
+          this.absN++;
+
+          // If recording, save the data using device's sample counter
+          if (this.isRecording) {
+            this.recordingData.push([sampleCounter, normCh0]);
+            this.totalRecordedSamples++;
+
+            // Write to IndexedDB in batches of 500 samples
+            if (this.recordingData.length >= 500) {
+              this.flushRecordingData();
+            }
+
+            // Check if duration limit reached
+            if (this.recordingDurationLimit !== null) {
+              const elapsed = Date.now() - this.recordingStartTime;
+              if (elapsed >= this.recordingDurationLimit) {
+                this.stopRecording();
+              }
+            }
+          }
+        },
+        handleNotification: function (event) {
+          const value = event.target.value;
+          if (value.byteLength === this.newPacketLen) {
+            for (let i = 0; i < this.newPacketLen; i += this.singleSampleLen) {
+              const sampleBuffer = value.buffer.slice(i, i + this.singleSampleLen);
+              this.processSample(new DataView(sampleBuffer));
+            }
+          } else if (value.byteLength === this.singleSampleLen) {
+            this.processSample(new DataView(value.buffer));
+          } else {
+            console.log("Unexpected packet length: " + value.byteLength);
+          }
+        },
+        connectBLE: async function () {
+          try {
+            if (!navigator.bluetooth) {
+              console.log("Web Bluetooth API not available.");
+              return;
+            }
+            console.log("Requesting Bluetooth device...");
+            this.device = await navigator.bluetooth.requestDevice({
+              filters: [{ namePrefix: "NPG" }],
+              optionalServices: [SERVICE_UUID],
+            });
+            console.log("Connecting to GATT Server...");
+            this.server = await this.device.gatt.connect();
+            console.log("Getting Service...");
+            const service = await this.server.getPrimaryService(SERVICE_UUID);
+            console.log("Getting Control Characteristic...");
+            this.controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
+            console.log("Getting Data Characteristic...");
+            this.dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
+            // Detect packet format from device name
+            const devName = this.device.name || '';
+            if (devName.includes('6CH')) {
+              // 6 BioAmp channels + 1 battery = 7 total → SINGLE_SAMPLE_LEN = 2*6+1 = 13
+              this.singleSampleLen = 13;
+              this.newPacketLen = BLOCK_COUNT * 13; // 130
+              console.log('6CH device detected — packet size: 130 bytes');
+            } else {
+              // 3 BioAmp channels + 1 battery = 4 total → SINGLE_SAMPLE_LEN = 2*3+1 = 7
+              this.singleSampleLen = 7;
+              this.newPacketLen = BLOCK_COUNT * 7; // 70
+              console.log('3CH device detected — packet size: 70 bytes');
+            }
+            this.connected = true;
+            this.updateButtonStates();
+            console.log("Device connected.");
+            // Automatically send START command to begin streaming
+            await this.startStream();
+          } catch (error) { console.log("Error: " + error); }
+        },
+        disconnectBLE: async function () {
+          try {
+            if (this.device && this.device.gatt.connected) {
+              console.log("Disconnecting...");
+              await this.device.gatt.disconnect();
+              this.connected = false;
+              this.streaming = false;
+              this.updateButtonStates();
+              console.log("Device disconnected.");
+              this.startTime = null;
+              timeDisplay.textContent = "00:00";
+            }
+          } catch (error) { console.log("Error disconnecting: " + error); }
+        },
+        startStream: async function () {
+          try {
+            if (!this.dataChar || !this.controlChar) {
+              console.log("Device not connected.");
+              return;
+            }
+            // Reset detector + circular buffer so positions stay in sync
+            this.panTompkins.reset();
+            this.sampleIndex = 0;
+            this.dataCh0.fill(0);
+            this.peakFlags.fill(0);
+            this.prevSampleCounter = null;
+            console.log("Sending START command...");
+            await this.controlChar.writeValue(new TextEncoder().encode("START"));
+            console.log("Starting notifications...");
+            await this.dataChar.startNotifications();
+            this.dataChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+            this.streaming = true;
+            console.log("Streaming started.");
+            this.startTime = Date.now();
+            updateMonitoringTime();
+          } catch (error) { console.log("Error starting stream: " + error); }
+        },
+        computeBPM: function () {
+          // Valid physiological range: 40–120 BPM.
+          // Outside this range the reading is unreliable — show '--'.
+          const bpm = this.panTompkins.bpm;
+          return (bpm >= 40 && bpm <= 120) ? bpm : null;
+        },
+        triggerHeartbeat: function () {
+          // Sync heartbeat animation with each detected peak
+          heartIcon.classList.remove("beating");
+          // Trigger reflow to restart animation
+          void heartIcon.offsetWidth;
+          heartIcon.classList.add("beating");
+        },
+        updateBPMDisplay: function (bpm) {
+          if (bpm !== null) {
+            bpmText.textContent = Math.round(bpm) + " BPM";
+          } else {
+            bpmText.textContent = "-- BPM";
+          }
+        },
+        // Toggle the peaks visibility by updating the peak line color
+        togglePeaks: function () {
+          this.peaksVisible = !this.peaksVisible;
+          if (this.peaksVisible) {
+            const c = getPeakColor();
+            this.peakLine.color = new ColorRGBA(c[0], c[1], c[2], 1);
+            peaksToggleBtn.textContent = "Hide Peaks";
+          } else {
+            this.peakLine.color = new ColorRGBA(0, 0, 0, 0);
+            peaksToggleBtn.textContent = "Show Peaks";
+          }
+        },
+        // Initialize Web Worker (inlined as Blob to work under file:// origin)
+        // Open (and cache) the IndexedDB connection — no worker needed
+        openRecordingDB: async function () {
+          if (this._db) return this._db;
+          this._db = await new Promise((res, rej) => {
+            const req = indexedDB.open('ECGRecordings', 2);
+            req.onupgradeneeded = e => {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains('ECGRecordings'))
+                db.createObjectStore('ECGRecordings', { keyPath: 'filename' });
+            };
+            req.onsuccess = e => res(e.target.result);
+            req.onerror = e => rej(e.target.error);
+          });
+          return this._db;
+        },
+        // Append a batch of rows to IndexedDB directly (no worker)
+        flushRecordingData: async function () {
+          if (!this.recordingData.length) return;
+          const rows = [...this.recordingData];
+          this.recordingData = [];
+          try {
+            const db = await this.openRecordingDB();
+            const filename = this.recordingFilename;
+            const existing = await new Promise((res, rej) => {
+              const req = db.transaction('ECGRecordings', 'readonly')
+                .objectStore('ECGRecordings').get(filename);
+              req.onsuccess = () => res(req.result);
+              req.onerror = () => rej(req.error);
+            });
+            const record = existing
+              ? { filename, content: [...existing.content, ...rows] }
+              : { filename, content: rows };
+            await new Promise((res, rej) => {
+              const req = db.transaction('ECGRecordings', 'readwrite')
+                .objectStore('ECGRecordings').put(record);
+              req.onsuccess = () => res();
+              req.onerror = () => rej(req.error);
+            });
+          } catch (e) { console.error('IDB write failed:', e); }
+        },
+        // Start recording
+        startRecording: function () {
+          this.isRecording = true;
+          this.recordingStartTime = Date.now();
+          this.recordingData = [];
+          this.totalRecordedSamples = 0;
+
+          // Generate filename with timestamp
+          const now = new Date();
+          this.recordingFilename = `ECG-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-` +
+            `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.csv`;
+
+          // Show recording timer with initial 00:00:00
+          recordingTimer.querySelector('span').textContent = '00:00:00';
+          recordingControls.style.display = "flex";
+
+          // Update timer every second
+          this.recordingTimer = setInterval(() => {
+            const elapsed = Date.now() - this.recordingStartTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            recordingTimer.querySelector('span').textContent =
+              `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+          }, 1000);
+
+          this.updateButtonStates();
+          console.log("Recording started:", this.recordingFilename);
+        },
+        // Stop recording
+        stopRecording: function () {
+          this.isRecording = false;
+          if (this.recordingData.length > 0) { this.flushRecordingData(); }
+          recordingControls.style.display = "none";
+          clearInterval(this.recordingTimer);
+          this.recordingTimer = null;
+          this.updateButtonStates();
+
+          // Compute duration
+          const durationMs = Date.now() - this.recordingStartTime;
+          const secs = Math.floor(durationMs / 1000);
+          const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+          const ss = String(secs % 60).padStart(2, '0');
+          const durationStr = `${mm}:${ss}`;
+
+          // Push to session list and refresh dropup
+          this.sessionRecordings.push({
+            filename: this.recordingFilename,
+            duration: durationStr,
+            samples: this.totalRecordedSamples
+          });
+          refreshDropup();
+
+          // Non-blocking toast instead of alert()
+          showToast(
+            `<strong>✓ Recording saved</strong>` +
+            `${this.recordingFilename}<br>` +
+            `Duration: ${durationStr} &nbsp;•&nbsp; Samples: ${this.totalRecordedSamples.toLocaleString()}`
+          );
+          console.log("Recording stopped:", this.recordingFilename, "samples:", this.totalRecordedSamples);
+        },
+        // Flush recording data to IndexedDB (called periodically + on stop)
+        // flushRecordingData is now async — defined above as openRecordingDB/flushRecordingData
+        // Toggle recording
+        toggleRecording: function () {
+          if (this.isRecording) {
+            this.stopRecording();
+          } else {
+            this.startRecording();
+          }
+        }
+      };
+
+      // Initialize WebGLPlot and main ECG line
+      connection.wglp = new WebglPlot(canvas);
+      connection.line0 = new WebglLine(new ColorRGBA(0.8, 0.2, 0.2, 1), NUM_POINTS);
+      connection.line0.lineWidth = 40;
+      connection.line0.arrangeX();
+      connection.wglp.addLine(connection.line0);
+
+      // Theme-aware color palettes for ECG line and peak marker
+      function getLineColor() {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        // Dark: crimson red  |  Light: dark red
+        return isLight ? [0.72, 0.04, 0.04] : [0.85, 0.16, 0.16];
+      }
+      function getPeakColor() {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        // Dark: bright green  |  Light: dark forest green
+        return isLight ? [0.0, 0.48, 0.12] : [0, 1, 0];
+      }
+      // Apply both colors live (called on init + theme toggle)
+      function applyThemeColors() {
+        if (!connection.line0 || !connection.peakLine) return;
+        const lc = getLineColor();
+        connection.line0.color = new ColorRGBA(lc[0], lc[1], lc[2], 1);
+        if (connection.peaksVisible !== false) {
+          const pc = getPeakColor();
+          connection.peakLine.color = new ColorRGBA(pc[0], pc[1], pc[2], 1);
+        }
+      }
+      window._applyThemeColors = applyThemeColors;
+
+      // Initialize ECG line with current-theme color
+      const lc = getLineColor();
+      connection.line0.color = new ColorRGBA(lc[0], lc[1], lc[2], 1);
+
+      // Second line for peak highlighting (initially visible)
+      const pc = getPeakColor();
+      connection.peakLine = new WebglLine(new ColorRGBA(pc[0], pc[1], pc[2], 1), NUM_POINTS);
+      connection.peakLine.lineWidth = 4;
+      connection.peakLine.arrangeX();
+      connection.wglp.addLine(connection.peakLine);
+
+      // Animation loop — ECG plot + peak markers from Pan-Tompkins flags
+      const PEAK_HALF_WIDTH = 7;  // ±7 samples (~28 ms) either side of each R-peak
+      const peakDisplay = new Float32Array(NUM_POINTS); // reused each frame
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!connection.dataCh0) return;
+        const maxCh0 = Math.max(...connection.dataCh0.map(Math.abs));
+        const currentMax = Math.max(maxCh0, 1e-6);
+        const scaleFactor = currentMax > 0.9 ? 0.9 / currentMax : 1;
+        const peakOffset = 0.06;
+
+        // Dynamic baseline: mean of the entire buffer (adapts to electrode drift)
+        let baselineSum = 0;
+        for (let i = 0; i < NUM_POINTS; i++) baselineSum += connection.dataCh0[i];
+        const baselineScaled = (baselineSum / NUM_POINTS) * scaleFactor;
+
+        // Pass 1: draw ECG line, build inverted-U (⊓) peak markers.
+        // NaN → WebGL skips segments, so only the ⊓ shape renders (no connectors).
+        peakDisplay.fill(NaN);
+        const capOffset = 0.03;  // gap between R-peak tip and bottom of legs
+        const capHeight = 0.08;  // height of the cap (half of previous)
+        for (let i = 0; i < NUM_POINTS; i++) {
+          connection.line0.setY(i, connection.dataCh0[i] * scaleFactor);
+          if (connection.peakFlags[i]) {
+            const yScaled = connection.dataCh0[i] * scaleFactor;
+            if (yScaled > baselineScaled) {
+              const topY = yScaled;             // flat roof sits AT the R-peak tip
+              const botY = yScaled - capHeight; // legs hang downward from the tip
+              const lo = Math.max(0, i - PEAK_HALF_WIDTH);
+              const hi = Math.min(NUM_POINTS - 1, i + PEAK_HALF_WIDTH);
+              // Left leg (botY → topY transition renders as near-vertical)
+              peakDisplay[lo] = botY;
+              // Flat top
+              for (let j = lo + 1; j < hi; j++) peakDisplay[j] = topY;
+              // Right leg (topY → botY transition renders as near-vertical)
+              peakDisplay[hi] = botY;
+            }
+          }
+        }
+        // Pass 2: write peak line
+        for (let i = 0; i < NUM_POINTS; i++) connection.peakLine.setY(i, peakDisplay[i]);
+        connection.wglp.update();
+      }
+      animate();
+
+      // BPM calculation and display update
+      const bpmWindow = [];
+      const windowSize = 5;
+      let displayedBPM = null;
+      const maxChangePerUpdate = 2;
+      function updateMonitoringTime() {
+        if (connection.startTime) {
+          const elapsed = Math.floor((Date.now() - connection.startTime) / 1000);
+          const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+          const seconds = (elapsed % 60).toString().padStart(2, '0');
+          timeDisplay.textContent = `${minutes}:${seconds}`;
+          requestAnimationFrame(updateMonitoringTime);
+        }
+      }
+      setInterval(() => {
+        const bpm = connection.computeBPM();
+        if (bpm !== null) {
+          bpmWindow.push(bpm);
+          if (bpmWindow.length > windowSize) { bpmWindow.shift(); }
+          const avgBPM = bpmWindow.reduce((a, b) => a + b, 0) / bpmWindow.length;
+          if (displayedBPM === null) { displayedBPM = avgBPM; }
+          else {
+            const diff = avgBPM - displayedBPM;
+            if (Math.abs(diff) > maxChangePerUpdate) {
+              displayedBPM += Math.sign(diff) * maxChangePerUpdate;
+            } else {
+              displayedBPM = avgBPM;
+            }
+          }
+          connection.updateBPMDisplay(displayedBPM);
+        } else {
+          connection.updateBPMDisplay(null);
+        }
+      }, 1000);
+
+      // Attach event listeners to control buttons
+      connectToggleBtn.addEventListener("click", function () {
+        if (!connection.connected) {
+          connection.connectBLE();
+        } else {
+          connection.disconnectBLE();
+        }
+      });
+
+      recordBtn.addEventListener("click", function (e) {
+        connection.toggleRecording();
+      });
+
+      // Dropup toggle & rendering
+      function refreshDropup() {
+        const fileList = dropup.querySelector(".file-list");
+        fileList.innerHTML = "";
+        if (connection.sessionRecordings.length === 0) {
+          fileList.innerHTML = '<li class="no-files">No recordings this session</li>';
+          return;
+        }
+        connection.sessionRecordings.slice().reverse().forEach(rec => {
+          const li = document.createElement("li");
+          li.classList.add("file-item");
+          li.innerHTML = `
+            <span class="file-name" title="${rec.filename}">${rec.filename}</span>
+            <div class="file-actions">
+              <button class="file-action-btn download" data-filename="${rec.filename}" title="Download CSV">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </button>
+              <button class="file-action-btn delete" data-filename="${rec.filename}" title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          `;
+          li.querySelector(".download").addEventListener("click", (e) => {
+            downloadFile(e.currentTarget.dataset.filename);
+          });
+          li.querySelector(".delete").addEventListener("click", (e) => {
+            const fn = e.currentTarget.dataset.filename;
+            connection.sessionRecordings = connection.sessionRecordings.filter(r => r.filename !== fn);
+            deleteFile(fn);
+            refreshDropup();
+          });
+          fileList.appendChild(li);
+        });
+      }
+
+      fileManagerBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        refreshDropup();
+        dropup.classList.toggle("open");
+      });
+
+      peaksToggleBtn.addEventListener("click", connection.togglePeaks.bind(connection));
+      connection.updateButtonStates();
+
+      // File Manager functions
+      function loadFileList() { } // kept for compat, not used
+
+      function displayFileList(files) { }
+
+      // Download directly from IndexedDB in the main thread (no worker needed for reads)
+      async function downloadFile(filename) {
+        try {
+          const db = await new Promise((res, rej) => {
+            const req = indexedDB.open('ECGRecordings', 2);
+            req.onsuccess = e => res(e.target.result);
+            req.onerror = e => rej(e.target.error);
+            req.onupgradeneeded = e => {
+              const d = e.target.result;
+              if (!d.objectStoreNames.contains('ECGRecordings')) {
+                d.createObjectStore('ECGRecordings', { keyPath: 'filename' });
+              }
+            };
+          });
+          const record = await new Promise((res, rej) => {
+            const tx = db.transaction('ECGRecordings', 'readonly');
+            const req = tx.objectStore('ECGRecordings').get(filename);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+          if (!record || !Array.isArray(record.content)) {
+            console.error('Download: no data found for', filename);
+            return;
+          }
+          const header = 'Sample Counter,CH0';
+          const rows = record.content.map(r => `${r[0]},${r[1]}`);
+          const csv = [header, ...rows].join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          console.log('Downloaded:', filename, record.content.length, 'rows');
+        } catch (e) {
+          console.error('Download failed:', e);
+        }
+      }
+
+      async function deleteFile(filename) {
+        try {
+          const db = await new Promise((res, rej) => {
+            const req = indexedDB.open('ECGRecordings', 2);
+            req.onsuccess = e => res(e.target.result);
+            req.onerror = e => rej(e.target.error);
+          });
+          await new Promise((res, rej) => {
+            const req = db.transaction('ECGRecordings', 'readwrite')
+              .objectStore('ECGRecordings').delete(filename);
+            req.onsuccess = () => res();
+            req.onerror = () => rej(req.error);
+          });
+          console.log('Deleted:', filename);
+        } catch (e) { console.error('Delete failed:', e); }
+      }
+
+      return connection;
+    }
+
+    // Theme toggle functionality
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      if (currentTheme === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+      }
+      // Update WebGL line colors to match new theme
+      if (window._applyThemeColors) window._applyThemeColors();
+    }
+
+    const themeToggle = document.querySelector('.theme-toggle');
+    themeToggle.addEventListener('click', toggleTheme);
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+
+    createDevicePanel();
+
+    document.addEventListener("fullscreenchange", function () {
+      if (!document.fullscreenElement) {
+        const fullscreenContainers = document.querySelectorAll(".canvas-container.fullscreen");
+        fullscreenContainers.forEach(container => {
+          container.classList.remove("fullscreen");
+        });
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const fullscreenThemeToggle = document.querySelector('.fullscreen-theme-toggle');
+      if (fullscreenThemeToggle) {
+        fullscreenThemeToggle.addEventListener('click', toggleTheme);
+      }
+    });
+  </script>
+</body>
+
+</html>
