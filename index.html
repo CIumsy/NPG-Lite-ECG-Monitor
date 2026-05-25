@@ -987,7 +987,10 @@
       const bpmText = document.createElement("span");
       bpmText.textContent = "-- BPM";
       bpmDisplay.appendChild(bpmText);
-      overlayTop.append(timeDisplay, bpmDisplay);
+      const dropDisplay = document.createElement("div");
+      dropDisplay.classList.add("overlay-metric");
+      dropDisplay.style.cssText = "display:none;color:var(--primary);background:rgba(255,56,56,0.18)";
+      overlayTop.append(timeDisplay, bpmDisplay, dropDisplay);
       overlay.appendChild(overlayTop);
       // Fullscreen theme toggle button
       const fullscreenThemeToggle = document.createElement("button");
@@ -1127,12 +1130,14 @@
         server: null,
         controlChar: null,
         dataChar: null,
+        _notifHandler: null,
         streaming: false,
         connected: false,
         canvas: canvas,
-        dataCh0: new Array(NUM_POINTS).fill(0),
+        dataCh0: new Float32Array(NUM_POINTS),
         sampleIndex: 0,
         prevSampleCounter: null,
+        droppedSamples: 0,
         lastActionTime: 0,
         wglp: null,
         line0: null,
@@ -1186,7 +1191,11 @@
           } else {
             const expected = (this.prevSampleCounter + 1) % 256;
             if (sampleCounter !== expected) {
-              console.log(`Missing sample: expected ${expected}, got ${sampleCounter}`);
+              const skipped = (sampleCounter - expected + 256) % 256;
+              this.droppedSamples += skipped;
+              dropDisplay.textContent = `⚠ ${this.droppedSamples} dropped`;
+              dropDisplay.style.display = '';
+              console.warn(`Sample gap: expected ${expected}, got ${sampleCounter} (${skipped} dropped, total ${this.droppedSamples})`);
             }
             this.prevSampleCounter = sampleCounter;
           }
@@ -1228,12 +1237,13 @@
         handleNotification: function (event) {
           const value = event.target.value;
           if (value.byteLength === this.newPacketLen) {
+            // Use offset DataView — no buffer copy, and correctly accounts for value.byteOffset
+            // so we read the right bytes even if the DataView starts mid-buffer.
             for (let i = 0; i < this.newPacketLen; i += this.singleSampleLen) {
-              const sampleBuffer = value.buffer.slice(i, i + this.singleSampleLen);
-              this.processSample(new DataView(sampleBuffer));
+              this.processSample(new DataView(value.buffer, value.byteOffset + i, this.singleSampleLen));
             }
           } else if (value.byteLength === this.singleSampleLen) {
-            this.processSample(new DataView(value.buffer));
+            this.processSample(value);
           } else {
             console.log("Unexpected packet length: " + value.byteLength);
           }
@@ -1283,6 +1293,13 @@
               // Stop any active recording before disconnecting so data is
               // flushed and the timer/UI are left in a consistent state.
               if (this.isRecording) this.stopRecording();
+              // Remove notification handler and stop notifications before disconnect
+              // so no stray events fire during or after teardown.
+              if (this.dataChar && this._notifHandler) {
+                this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
+                this._notifHandler = null;
+                try { await this.dataChar.stopNotifications(); } catch (e) { /* ignore */ }
+              }
               console.log("Disconnecting...");
               await this.device.gatt.disconnect();
               this.connected = false;
@@ -1306,11 +1323,19 @@
             this.dataCh0.fill(0);
             this.peakFlags.fill(0);
             this.prevSampleCounter = null;
+            this.droppedSamples = 0;
+            dropDisplay.style.display = 'none';
             console.log("Sending START command...");
             await this.controlChar.writeValue(new TextEncoder().encode("START"));
             console.log("Starting notifications...");
             await this.dataChar.startNotifications();
-            this.dataChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+            // Guard against duplicate listeners if the browser returns a cached
+            // characteristic object on reconnect within the same page session.
+            if (this._notifHandler) {
+              this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
+            }
+            this._notifHandler = this.handleNotification.bind(this);
+            this.dataChar.addEventListener("characteristicvaluechanged", this._notifHandler);
             this.streaming = true;
             console.log("Streaming started.");
             this.startTime = Date.now();
@@ -1354,11 +1379,16 @@
         openRecordingDB: async function () {
           if (this._db) return this._db;
           this._db = await new Promise((res, rej) => {
-            const req = indexedDB.open('ECGRecordings', 2);
+            const req = indexedDB.open('ECGRecordings', 3);
             req.onupgradeneeded = e => {
               const db = e.target.result;
               if (!db.objectStoreNames.contains('ECGRecordings'))
                 db.createObjectStore('ECGRecordings', { keyPath: 'filename' });
+              // Append-only batch store — avoids the O(N) read-modify-write on flush
+              if (!db.objectStoreNames.contains('ECGBatches')) {
+                const store = db.createObjectStore('ECGBatches', { keyPath: 'batchKey' });
+                store.createIndex('filename', 'filename', { unique: false });
+              }
             };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
@@ -1370,28 +1400,21 @@
         // the read-modify-write and overwrite each other's data.
         flushRecordingData: function () {
           if (!this.recordingData.length) return;
-          // Snapshot rows immediately (synchronous) so new samples can
-          // keep accumulating in recordingData while the DB write is pending.
+          // Snapshot rows immediately so new samples keep accumulating while the write is in flight.
           const rows = [...this.recordingData];
           this.recordingData = [];
           const filename = this.recordingFilename;
-          // Chain onto the existing queue — each flush waits for the previous.
+          // Each batch gets its own record — no read-modify-write, stays O(1) regardless of recording length.
+          const batchIndex = this._batchIndex++;
+          const batchKey = `${filename}|${String(batchIndex).padStart(8, '0')}`;
+          // Serialise writes so concurrent flushes can't interleave.
           this._writeQueue = (this._writeQueue || Promise.resolve())
             .then(async () => {
               try {
                 const db = await this.openRecordingDB();
-                const existing = await new Promise((res, rej) => {
-                  const req = db.transaction('ECGRecordings', 'readonly')
-                    .objectStore('ECGRecordings').get(filename);
-                  req.onsuccess = () => res(req.result);
-                  req.onerror = () => rej(req.error);
-                });
-                const record = existing
-                  ? { filename, content: [...existing.content, ...rows] }
-                  : { filename, content: rows };
                 await new Promise((res, rej) => {
-                  const req = db.transaction('ECGRecordings', 'readwrite')
-                    .objectStore('ECGRecordings').put(record);
+                  const req = db.transaction('ECGBatches', 'readwrite')
+                    .objectStore('ECGBatches').put({ batchKey, filename, batchIndex, rows });
                   req.onsuccess = () => res();
                   req.onerror = () => rej(req.error);
                 });
@@ -1404,6 +1427,7 @@
           this.recordingStartTime = Date.now();
           this.recordingData = [];
           this.totalRecordedSamples = 0;
+          this._batchIndex = 0;
 
           // Generate filename with timestamp
           const now = new Date();
@@ -1459,8 +1483,6 @@
           );
           console.log("Recording stopped:", this.recordingFilename, "samples:", this.totalRecordedSamples);
         },
-        // Flush recording data to IndexedDB (called periodically + on stop)
-        // flushRecordingData is now async — defined above as openRecordingDB/flushRecordingData
         // Toggle recording
         toggleRecording: function () {
           if (this.isRecording) {
@@ -1518,21 +1540,23 @@
       function animate() {
         requestAnimationFrame(animate);
         if (!connection.dataCh0) return;
-        const maxCh0 = Math.max(...connection.dataCh0.map(Math.abs));
+        // Single pass: max-abs + baseline sum — avoids per-frame array allocation
+        let maxCh0 = 0, baselineSum = 0;
+        const d = connection.dataCh0;
+        for (let i = 0; i < NUM_POINTS; i++) {
+          const v = d[i];
+          baselineSum += v;
+          const av = Math.abs(v);
+          if (av > maxCh0) maxCh0 = av;
+        }
         const currentMax = Math.max(maxCh0, 1e-6);
         const scaleFactor = currentMax > 0.9 ? 0.9 / currentMax : 1;
-        const peakOffset = 0.06;
-
-        // Dynamic baseline: mean of the entire buffer (adapts to electrode drift)
-        let baselineSum = 0;
-        for (let i = 0; i < NUM_POINTS; i++) baselineSum += connection.dataCh0[i];
         const baselineScaled = (baselineSum / NUM_POINTS) * scaleFactor;
 
         // Pass 1: draw ECG line, build inverted-U (⊓) peak markers.
         // NaN → WebGL skips segments, so only the ⊓ shape renders (no connectors).
         peakDisplay.fill(NaN);
-        const capOffset = 0.03;  // gap between R-peak tip and bottom of legs
-        const capHeight = 0.08;  // height of the cap (half of previous)
+        const capHeight = 0.08;
         for (let i = 0; i < NUM_POINTS; i++) {
           connection.line0.setY(i, connection.dataCh0[i] * scaleFactor);
           if (connection.peakFlags[i]) {
@@ -1661,33 +1685,37 @@
 
       function displayFileList(files) { }
 
-      // Download directly from IndexedDB in the main thread (no worker needed for reads)
+      // Download from IndexedDB — assembles per-batch records in order (no full read-back)
       async function downloadFile(filename) {
         try {
-          const db = await new Promise((res, rej) => {
-            const req = indexedDB.open('ECGRecordings', 2);
-            req.onsuccess = e => res(e.target.result);
-            req.onerror = e => rej(e.target.error);
-            req.onupgradeneeded = e => {
-              const d = e.target.result;
-              if (!d.objectStoreNames.contains('ECGRecordings')) {
-                d.createObjectStore('ECGRecordings', { keyPath: 'filename' });
-              }
-            };
-          });
-          const record = await new Promise((res, rej) => {
-            const tx = db.transaction('ECGRecordings', 'readonly');
-            const req = tx.objectStore('ECGRecordings').get(filename);
+          const db = await connection.openRecordingDB();
+          const batches = await new Promise((res, rej) => {
+            const req = db.transaction('ECGBatches', 'readonly')
+              .objectStore('ECGBatches').index('filename').getAll(filename);
             req.onsuccess = () => res(req.result);
             req.onerror = () => rej(req.error);
           });
-          if (!record || !Array.isArray(record.content)) {
-            console.error('Download: no data found for', filename);
-            return;
+          let allRows;
+          if (batches.length > 0) {
+            batches.sort((a, b) => a.batchIndex - b.batchIndex);
+            allRows = batches.flatMap(b => b.rows);
+          } else {
+            // Fallback: legacy single-record store (recordings from before this version)
+            const record = await new Promise((res, rej) => {
+              const req = db.transaction('ECGRecordings', 'readonly')
+                .objectStore('ECGRecordings').get(filename);
+              req.onsuccess = () => res(req.result);
+              req.onerror = () => rej(req.error);
+            });
+            if (!record || !Array.isArray(record.content)) {
+              console.error('Download: no data found for', filename);
+              return;
+            }
+            allRows = record.content;
           }
           const header = 'Sample Counter,CH0';
-          const rows = record.content.map(r => `${r[0]},${r[1]}`);
-          const csv = [header, ...rows].join('\n');
+          const csvRows = allRows.map(r => `${r[0]},${r[1]}`);
+          const csv = [header, ...csvRows].join('\n');
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -1697,7 +1725,7 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          console.log('Downloaded:', filename, record.content.length, 'rows');
+          console.log('Downloaded:', filename, allRows.length, 'rows');
         } catch (e) {
           console.error('Download failed:', e);
         }
@@ -1705,16 +1733,21 @@
 
       async function deleteFile(filename) {
         try {
-          const db = await new Promise((res, rej) => {
-            const req = indexedDB.open('ECGRecordings', 2);
-            req.onsuccess = e => res(e.target.result);
-            req.onerror = e => rej(e.target.error);
-          });
+          const db = await connection.openRecordingDB();
           await new Promise((res, rej) => {
-            const req = db.transaction('ECGRecordings', 'readwrite')
-              .objectStore('ECGRecordings').delete(filename);
-            req.onsuccess = () => res();
-            req.onerror = () => rej(req.error);
+            const tx = db.transaction(['ECGBatches', 'ECGRecordings'], 'readwrite');
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+            tx.onabort = () => rej(tx.error);
+            // Delete all batch records for this filename
+            const batchStore = tx.objectStore('ECGBatches');
+            const req = batchStore.index('filename').openKeyCursor(IDBKeyRange.only(filename));
+            req.onsuccess = e => {
+              const cursor = e.target.result;
+              if (cursor) { batchStore.delete(cursor.primaryKey); cursor.continue(); }
+            };
+            // Also remove from legacy store if present
+            tx.objectStore('ECGRecordings').delete(filename);
           });
           console.log('Deleted:', filename);
         } catch (e) { console.error('Delete failed:', e); }
