@@ -69,7 +69,8 @@
       width: 100%;
       height: 100%;
       display: block;
-      background: var(--graph-bg);
+      /* No background here — WebGL clears to transparent, so the
+         container's background-color + grid pattern show through. */
     }
 
     /* Overlay for timer and BPM */
@@ -1104,6 +1105,28 @@
       canvas.width  = Math.round(window.innerWidth  * dpr);
       canvas.height = Math.round(window.innerHeight * dpr);
 
+      // ECG grid — standard paper layout: small square = 0.04 s (20 samples @ 500 Hz),
+      // large square = 0.2 s (100 samples). Both axes use the same pixel size so the
+      // cells are square on screen. Recomputed whenever the container is resized.
+      function drawGrid() {
+        const w = canvasContainer.clientWidth;
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const sm = (w / NUM_POINTS) * 20;  // px per small square (0.04 s)
+        const lg = sm * 5;                 // px per large square (0.20 s)
+        // Dark: whitish-grey — neutral, visible, no colour conflict with green trace
+        // Light: blackish-grey — clear on white background without overpowering the trace
+        const major = isLight ? 'rgba(80,80,80,0.18)'   : 'rgba(155,155,155,0.15)';
+        const minor = isLight ? 'rgba(80,80,80,0.09)'   : 'rgba(175,175,175,0.06)';
+        canvasContainer.style.backgroundImage = [
+          `repeating-linear-gradient(to right,  ${major} 0, ${major} 1px, transparent 1px, transparent ${lg}px)`,
+          `repeating-linear-gradient(to bottom, ${major} 0, ${major} 1px, transparent 1px, transparent ${lg}px)`,
+          `repeating-linear-gradient(to right,  ${minor} 0, ${minor} 1px, transparent 1px, transparent ${sm}px)`,
+          `repeating-linear-gradient(to bottom, ${minor} 0, ${minor} 1px, transparent 1px, transparent ${sm}px)`,
+        ].join(', ');
+      }
+      window._drawGrid = drawGrid;
+      drawGrid();
+
       // Keep the canvas sharp on window / orientation resize
       const resizeObserver = new ResizeObserver(() => {
         const newDpr = window.devicePixelRatio || 1;
@@ -1121,6 +1144,7 @@
             if (window._applyThemeColors) window._applyThemeColors();
           }
         }
+        drawGrid(); // Recompute grid spacing for new container width
       });
       resizeObserver.observe(canvasContainer);
 
@@ -1299,6 +1323,11 @@
                 this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
                 this._notifHandler = null;
                 try { await this.dataChar.stopNotifications(); } catch (e) { /* ignore */ }
+              }
+              // Tell the firmware to stop streaming so it returns to idle state.
+              // Without this the device stays in streaming mode and may refuse reconnection.
+              if (this.controlChar) {
+                try { await this.controlChar.writeValue(new TextEncoder().encode("STOP")); } catch (e) { /* ignore */ }
               }
               console.log("Disconnecting...");
               await this.device.gatt.disconnect();
@@ -1500,16 +1529,18 @@
       connection.line0.arrangeX();
       connection.wglp.addLine(connection.line0);
 
-      // Theme-aware color palettes for ECG line and peak marker
+      // Theme-aware color palettes — IEC 60601-1-8: ECG trace is green on monitors.
+      // R-peak markers use red so they stand out as a clinical highlight.
       function getLineColor() {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-        // Dark: crimson red  |  Light: dark red
-        return isLight ? [0.72, 0.04, 0.04] : [0.85, 0.16, 0.16];
+        // Dark: #00E676 bright lime-green (cardiac monitor standard)
+        // Light: #2E7D32 dark green (like ECG ink on paper)
+        return isLight ? [0.180, 0.490, 0.196] : [0.0, 0.902, 0.463];
       }
       function getPeakColor() {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-        // Dark: bright green  |  Light: dark forest green
-        return isLight ? [0.0, 0.48, 0.12] : [0, 1, 0];
+        // Dark: #FF1744 vivid red  |  Light: #C62828 deep red
+        return isLight ? [0.776, 0.157, 0.157] : [1.0, 0.090, 0.267];
       }
       // Apply both colors live (called on init + theme toggle)
       function applyThemeColors() {
@@ -1771,8 +1802,9 @@
         document.documentElement.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
       }
-      // Update WebGL line colors to match new theme
+      // Update WebGL line colors and grid to match new theme
       if (window._applyThemeColors) window._applyThemeColors();
+      if (window._drawGrid) window._drawGrid();
     }
 
     const themeToggle = document.querySelector('.theme-toggle');
