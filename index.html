@@ -1178,6 +1178,8 @@
         controlChar: null,
         dataChar: null,
         _notifHandler: null,
+        _dataCheckInterval: null,
+        _samplesThisSecond: 0,
         streaming: false,
         connected: false,
         canvas: canvas,
@@ -1236,6 +1238,7 @@
         },
         processSample: function (dataView) {
           if (dataView.byteLength !== this.singleSampleLen) return;
+          this._samplesThisSecond++;
           const sampleCounter = dataView.getUint8(0);
           if (this.prevSampleCounter === null) {
             this.prevSampleCounter = sampleCounter;
@@ -1315,6 +1318,10 @@
             this.device.addEventListener('gattserverdisconnected', () => {
               if (this.connected) {
                 console.log("Device unexpectedly disconnected.");
+                if (this._dataCheckInterval) {
+                  clearInterval(this._dataCheckInterval);
+                  this._dataCheckInterval = null;
+                }
                 if (this.isRecording) this.stopRecording();
                 if (this._notifHandler) {
                   try { this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler); } catch (e) { /* ignore */ }
@@ -1376,39 +1383,39 @@
           } catch (error) { console.log("Error: " + error); }
         },
         disconnectBLE: async function () {
+          // Clear data watchdog immediately so it doesn't fire during teardown
+          if (this._dataCheckInterval) {
+            clearInterval(this._dataCheckInterval);
+            this._dataCheckInterval = null;
+          }
           try {
-            if (this.device && this.device.gatt.connected) {
-              // Stop any active recording before disconnecting so data is
-              // flushed and the timer/UI are left in a consistent state.
-              if (this.isRecording) this.stopRecording();
-              // Remove notification handler and stop notifications before disconnect
-              // so no stray events fire during or after teardown.
-              if (this.dataChar && this._notifHandler) {
-                this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
-                this._notifHandler = null;
-                try { await this.dataChar.stopNotifications(); } catch (e) { /* ignore */ }
-              }
-              // Tell the firmware to stop streaming so it returns to idle state.
-              // Without this the device stays in streaming mode and may refuse reconnection.
-              if (this.controlChar) {
-                try { await this.controlChar.writeValue(new TextEncoder().encode("STOP")); } catch (e) { /* ignore */ }
-              }
-              console.log("Disconnecting...");
-              await this.device.gatt.disconnect();
-              this.connected = false;
-              this.streaming = false;
-              this.updateButtonStates();
-              console.log("Device disconnected.");
-              this.startTime = null;
-              timeDisplay.textContent = "00:00";
-              this.dataCh0.fill(0);
-              this.peakFlags.fill(0);
-              this.sampleIndex = 0;
-              this.panTompkins.reset();
-              bpmText.textContent = "-- BPM";
-              dropDisplay.style.display = 'none';
+            if (this.isRecording) this.stopRecording();
+            if (this.dataChar && this._notifHandler) {
+              this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
+              this._notifHandler = null;
+              try { await this.dataChar.stopNotifications(); } catch (e) { /* ignore */ }
             }
-          } catch (error) { console.log("Error disconnecting: " + error); }
+            if (this.controlChar) {
+              try { await this.controlChar.writeValue(new TextEncoder().encode("STOP")); } catch (e) { /* ignore */ }
+            }
+            if (this.device && this.device.gatt.connected) {
+              try { await this.device.gatt.disconnect(); } catch (e) { /* ignore */ }
+            }
+          } finally {
+            // Always reset state — even if any step above threw
+            this.connected = false;
+            this.streaming = false;
+            this.updateButtonStates();
+            this.startTime = null;
+            timeDisplay.textContent = "00:00";
+            this.dataCh0.fill(0);
+            this.peakFlags.fill(0);
+            this.sampleIndex = 0;
+            this.panTompkins.reset();
+            bpmText.textContent = "-- BPM";
+            dropDisplay.style.display = 'none';
+            console.log("Device disconnected.");
+          }
         },
         startStream: async function () {
           try {
@@ -1436,6 +1443,17 @@
             this._notifHandler = this.handleNotification.bind(this);
             this.dataChar.addEventListener("characteristicvaluechanged", this._notifHandler);
             this.streaming = true;
+            this._samplesThisSecond = 0;
+            if (this._dataCheckInterval) clearInterval(this._dataCheckInterval);
+            this._dataCheckInterval = setInterval(() => {
+              if (this.streaming && this._samplesThisSecond === 0) {
+                console.log("No data received for 1 s — auto-disconnecting.");
+                clearInterval(this._dataCheckInterval);
+                this._dataCheckInterval = null;
+                this.disconnectBLE();
+              }
+              this._samplesThisSecond = 0;
+            }, 1000);
             console.log("Streaming started.");
             this.startTime = Date.now();
             updateMonitoringTime();
