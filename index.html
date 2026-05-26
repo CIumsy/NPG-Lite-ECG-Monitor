@@ -15,9 +15,9 @@
       --panel-bg: #1e293b;
       --graph-bg: #000000;
       --success: #2ed573;
-      --button-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-      --btn-bg: #253347;
-      --btn-text: #e2e8f0;
+      --btn-bg: transparent;
+      --btn-border: rgba(255, 255, 255, 0.75);
+      --btn-text: #ffffff;
     }
 
     [data-theme="light"] {
@@ -29,8 +29,9 @@
       --panel-bg: #e9ecef;
       --graph-bg: #ffffff;
       /* Overlay on white graph needs a dark tint to be readable */
-      --btn-bg: #607d8b;
-      --btn-text: #ffffff;
+      --btn-bg: transparent;
+      --btn-border: rgba(0, 0, 0, 0.7);
+      --btn-text: #000000;
     }
 
     /* Base styles */
@@ -145,8 +146,8 @@
 
     /* Fullscreen toggle button */
     .fullscreen-btn {
-      background-color: var(--btn-bg);
-      border: none;
+      background: transparent;
+      border: 1.5px solid var(--btn-border);
       color: var(--btn-text);
       width: 36px;
       height: 36px;
@@ -160,7 +161,8 @@
     }
 
     .fullscreen-btn:hover {
-      background-color: var(--primary);
+      background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
       transform: scale(1.15);
     }
@@ -376,43 +378,44 @@
     }
 
     .btn.recording {
-      background-color: var(--primary);
+      border-color: var(--primary);
       animation: pulse 1.5s infinite;
     }
 
     @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.7;
-      }
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
     }
 
     .btn {
-      background-color: var(--btn-bg);
-      border: none;
+      background: transparent;
+      border: 1.5px solid var(--btn-border);
       color: var(--btn-text);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s;
-      font-weight: 600;
-      box-shadow: var(--button-shadow);
-      min-width: 80px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       touch-action: manipulation;
       position: relative;
+      flex-shrink: 0;
+    }
+
+    .btn svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
     }
 
     .btn:hover:not(:disabled) {
-      background-color: var(--primary);
+      background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
       transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
 
     .btn:disabled {
@@ -429,9 +432,9 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background-color: var(--btn-bg);
+      background: transparent;
+      border: 1.5px solid var(--btn-border);
       color: var(--btn-text);
-      border: none;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -443,7 +446,8 @@
 
     .theme-toggle:hover,
     .fullscreen-theme-toggle:hover {
-      background-color: var(--primary);
+      background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
       transform: scale(1.1);
     }
@@ -505,10 +509,8 @@
       }
 
       .btn {
-        padding: 6px 10px;
-        font-size: 12px;
-        min-width: 0;
-        flex: 1 1 calc(50% - 6px);
+        width: 36px;
+        height: 36px;
       }
 
       .theme-toggle,
@@ -995,8 +997,16 @@
       controlsOverlay.classList.add("controls-overlay");
       // Merged connect/disconnect button; clicking it will both connect and start streaming
       const connectToggleBtn = document.createElement("button");
-      connectToggleBtn.textContent = "Connect";
       connectToggleBtn.classList.add("btn");
+      connectToggleBtn.setAttribute("aria-label", "Connect");
+      connectToggleBtn.title = "Connect";
+      connectToggleBtn.innerHTML = `
+        <svg class="icon-connect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m7 7 10 10-5 5V2l5 5L7 17"/>
+        </svg>
+        <svg class="icon-disconnect" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m17 17-5 5V12l-5 5"/><path d="m2 2 20 20"/><path d="M14.5 9.5 17 7l-5-5v4.5"/>
+        </svg>`;
 
       // Record button wrapper with duration badge on top
       const recordBtnWrapper = document.createElement("div");
@@ -1004,17 +1014,33 @@
 
       // Record button
       const recordBtn = document.createElement("button");
-      recordBtn.textContent = "Record";
       recordBtn.classList.add("btn");
       recordBtn.disabled = true;
+      recordBtn.setAttribute("aria-label", "Start recording");
+      recordBtn.title = "Record";
+      recordBtn.innerHTML = `
+        <svg class="icon-record" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="8" fill="var(--primary)"/>
+        </svg>
+        <svg class="icon-stop" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="5" y="5" width="14" height="14" rx="2" fill="var(--primary)"/>
+        </svg>`;
       recordBtnWrapper.appendChild(recordBtn);
 
       // Recordings button + dropup wrapper
       const recordingsWrapper = document.createElement("div");
       recordingsWrapper.style.cssText = 'position:relative;display:flex';
       const fileManagerBtn = document.createElement("button");
-      fileManagerBtn.textContent = "Recordings";
       fileManagerBtn.classList.add("btn");
+      fileManagerBtn.setAttribute("aria-label", "View recordings");
+      fileManagerBtn.title = "Recordings";
+      fileManagerBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v11.5"/>
+          <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+          <path d="M8 12v-1"/><path d="M8 18v-2"/><path d="M8 7V6"/>
+          <circle cx="8" cy="20" r="2"/>
+        </svg>`;
       // Dropup panel (session-only, no full-screen modal)
       const dropup = document.createElement("div");
       dropup.classList.add("recordings-dropup");
@@ -1036,10 +1062,22 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => recToast.classList.remove("show"), 4500);
       }
-      // Toggle Peaks button
+      // Toggle Peaks button — eye = peaks visible (click to hide), eye-off = peaks hidden (click to show)
       const peaksToggleBtn = document.createElement("button");
-      peaksToggleBtn.textContent = "Hide Peaks";
       peaksToggleBtn.classList.add("btn");
+      peaksToggleBtn.setAttribute("aria-label", "Hide peaks");
+      peaksToggleBtn.title = "Hide peaks";
+      peaksToggleBtn.innerHTML = `
+        <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <svg class="icon-eye-off" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
+          <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
+          <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
+          <path d="m2 2 20 20"/>
+        </svg>`;
       controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn, fullscreenBtn);
       overlay.appendChild(controlsOverlay);
 
@@ -1184,15 +1222,19 @@
         totalRecordedSamples: 0,
 
         updateButtonStates: function () {
-          // Update merged connect/disconnect button text
-          connectToggleBtn.textContent = this.connected ? "Disconnect" : "Connect";
-          recordBtn.disabled = !this.connected;
-          recordBtn.textContent = this.isRecording ? "Stop Recording" : "Record";
-          if (this.isRecording) {
-            recordBtn.classList.add("recording");
-          } else {
-            recordBtn.classList.remove("recording");
-          }
+          const isConn = this.connected;
+          connectToggleBtn.querySelector('.icon-connect').style.display    = isConn ? 'none'  : 'block';
+          connectToggleBtn.querySelector('.icon-disconnect').style.display = isConn ? 'block' : 'none';
+          connectToggleBtn.setAttribute('aria-label', isConn ? 'Disconnect' : 'Connect');
+          connectToggleBtn.title = isConn ? 'Disconnect' : 'Connect';
+          recordBtn.disabled = !isConn;
+          const isRec = this.isRecording;
+          recordBtn.querySelector('.icon-record').style.display = isRec ? 'none'  : 'block';
+          recordBtn.querySelector('.icon-stop').style.display   = isRec ? 'block' : 'none';
+          recordBtn.setAttribute('aria-label', isRec ? 'Stop recording' : 'Start recording');
+          recordBtn.title = isRec ? 'Stop recording' : 'Record';
+          if (isRec) { recordBtn.classList.add("recording"); }
+          else        { recordBtn.classList.remove("recording"); }
         },
         normalizeSample: function (sample) {
           const ADC_MAX = 4096;
@@ -1431,10 +1473,16 @@
           if (this.peaksVisible) {
             const c = getPeakColor();
             this.peakLine.color = new ColorRGBA(c[0], c[1], c[2], 1);
-            peaksToggleBtn.textContent = "Hide Peaks";
+            peaksToggleBtn.querySelector('.icon-eye').style.display     = 'block';
+            peaksToggleBtn.querySelector('.icon-eye-off').style.display = 'none';
+            peaksToggleBtn.setAttribute('aria-label', 'Hide peaks');
+            peaksToggleBtn.title = 'Hide peaks';
           } else {
             this.peakLine.color = new ColorRGBA(0, 0, 0, 0);
-            peaksToggleBtn.textContent = "Show Peaks";
+            peaksToggleBtn.querySelector('.icon-eye').style.display     = 'none';
+            peaksToggleBtn.querySelector('.icon-eye-off').style.display = 'block';
+            peaksToggleBtn.setAttribute('aria-label', 'Show peaks');
+            peaksToggleBtn.title = 'Show peaks';
           }
         },
         // Initialize Web Worker (inlined as Blob to work under file:// origin)
