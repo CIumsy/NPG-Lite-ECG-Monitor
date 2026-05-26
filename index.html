@@ -14,13 +14,10 @@
       --background: #020617;
       --panel-bg: #1e293b;
       --graph-bg: #000000;
-      --overlay-bg: rgba(15, 23, 42, 0.85);
       --success: #2ed573;
       --button-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-      /* Button-specific tokens (dark mode) */
-      --btn-bg: #1e293b;
-      /* slate-800: subtle lift above graph black */
-      --btn-text: #f1f5f9;
+      --btn-bg: #253347;
+      --btn-text: #e2e8f0;
     }
 
     [data-theme="light"] {
@@ -32,10 +29,7 @@
       --panel-bg: #e9ecef;
       --graph-bg: #ffffff;
       /* Overlay on white graph needs a dark tint to be readable */
-      --overlay-bg: rgba(51, 65, 85, 0.82);
-      /* Button-specific tokens (light mode) */
-      --btn-bg: #64748b;
-      /* slate-500: calm mid-grey, clearly visible on white */
+      --btn-bg: #607d8b;
       --btn-text: #ffffff;
     }
 
@@ -91,33 +85,27 @@
     }
 
     .overlay-metric {
-      background-color: var(--overlay-bg);
       color: var(--text);
       padding: 6px 12px;
-      border-radius: 20px;
       font-size: 0.8rem;
       font-weight: 600;
-      backdrop-filter: blur(8px);
       white-space: nowrap;
     }
 
     .overlay-bpm {
-      background-color: var(--overlay-bg);
       padding: 8px 16px;
-      border-radius: 25px;
       font-size: 1.2rem;
       font-weight: 700;
       color: var(--primary);
       display: flex;
       align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(8px);
+      gap: 14px;
       white-space: nowrap;
     }
 
     .heart-icon {
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
       background-color: var(--primary);
       transform: rotate(45deg);
       position: relative;
@@ -149,28 +137,25 @@
     .heart-icon:before,
     .heart-icon:after {
       content: "";
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
       background-color: var(--primary);
       border-radius: 50%;
       position: absolute;
     }
 
     .heart-icon:before {
-      top: -9px;
+      top: -7px;
       left: 0;
     }
 
     .heart-icon:after {
       top: 0;
-      left: -9px;
+      left: -7px;
     }
 
     /* Fullscreen toggle button */
     .fullscreen-btn {
-      position: absolute;
-      bottom: 15px;
-      right: 15px;
       background-color: var(--btn-bg);
       border: none;
       color: var(--btn-text);
@@ -182,22 +167,21 @@
       justify-content: center;
       cursor: pointer;
       pointer-events: auto;
-      z-index: 20;
-      opacity: 0.85;
       transition: all 0.2s;
-      backdrop-filter: blur(5px);
     }
 
     .fullscreen-btn:hover {
-      opacity: 1;
       background-color: var(--primary);
-      transform: scale(1.1);
+      color: #fff;
+      transform: scale(1.15);
     }
 
     .fullscreen-btn svg {
-      width: 18px;
-      height: 18px;
+      width: 24px;
+      height: 24px;
       fill: currentColor;
+      stroke: currentColor;
+      stroke-width: 0.5;
     }
 
     /* Controls overlay */
@@ -453,8 +437,8 @@
       position: absolute;
       top: 15px;
       right: 15px;
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background-color: var(--btn-bg);
       color: var(--btn-text);
@@ -463,7 +447,6 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
       z-index: 99999;
       transition: all 0.3s;
       touch-action: manipulation;
@@ -481,6 +464,10 @@
       width: 20px;
       height: 20px;
     }
+
+    .theme-icon-moon { display: none; }
+    [data-theme="light"] .theme-icon-sun { display: none; }
+    [data-theme="light"] .theme-icon-moon { display: block; }
 
     .fullscreen-theme-toggle {
       display: none;
@@ -537,21 +524,13 @@
 
       .theme-toggle,
       .fullscreen-theme-toggle {
-        width: 36px;
-        height: 36px;
-      }
-
-      .theme-toggle svg,
-      .fullscreen-theme-toggle svg {
-        width: 18px;
-        height: 18px;
+        width: 28px;
+        height: 28px;
       }
 
       .fullscreen-btn {
         width: 32px;
         height: 32px;
-        bottom: 10px;
-        right: 10px;
       }
 
       .fullscreen-btn svg {
@@ -561,10 +540,6 @@
     }
 
     @media (orientation: portrait) and (max-width: 600px) {
-      .fullscreen-btn {
-        bottom: 90px;
-      }
-
       .controls-overlay {
         bottom: 15px;
         display: flex;
@@ -614,11 +589,17 @@
   <!-- Fullscreen display container -->
   <div id="deviceContainer"></div>
 
-  <!-- Theme toggle button using original icon -->
+  <!-- Theme toggle button -->
   <button class="theme-toggle" aria-label="Toggle theme">
-    <svg viewBox="0 0 24 24">
-      <path
-        d="M12 18c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm-7-2c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm14 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM12 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm0 22c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm-9-9c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm18 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM5.6 4.6c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm0-12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm-12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0z" />
+    <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2"/><path d="M12 20v2"/>
+      <path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+      <path d="M2 12h2"/><path d="M20 12h2"/>
+      <path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+    </svg>
+    <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
     </svg>
   </button>
 
@@ -998,8 +979,15 @@
       fullscreenThemeToggle.classList.add("fullscreen-theme-toggle");
       fullscreenThemeToggle.setAttribute("aria-label", "Toggle theme in fullscreen");
       fullscreenThemeToggle.innerHTML = `
-        <svg viewBox="0 0 24 24">
-          <path d="M12 18c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm-7-2c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm14 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM12 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm0 22c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm-9-9c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm18 0c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zM5.6 4.6c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm0-12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0zm-12.8 12.8c-.4-.4-.4-1 0-1.4s1-.4 1.4 0c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0z"/>
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2"/><path d="M12 20v2"/>
+          <path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+          <path d="M2 12h2"/><path d="M20 12h2"/>
+          <path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+        </svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
         </svg>
       `;
       overlay.appendChild(fullscreenThemeToggle);
@@ -1013,7 +1001,6 @@
         </svg>
       `;
       fullscreenBtn.addEventListener("click", toggleFullscreen);
-      overlay.appendChild(fullscreenBtn);
       // Controls overlay with merged Connect/Disconnect and Toggle Peaks button
       const controlsOverlay = document.createElement("div");
       controlsOverlay.classList.add("controls-overlay");
@@ -1024,7 +1011,7 @@
 
       // Record button wrapper with duration badge on top
       const recordBtnWrapper = document.createElement("div");
-      recordBtnWrapper.style.cssText = 'position:relative;display:inline-block';
+      recordBtnWrapper.style.cssText = 'position:relative;display:flex';
 
       // Record button
       const recordBtn = document.createElement("button");
@@ -1035,7 +1022,7 @@
 
       // Recordings button + dropup wrapper
       const recordingsWrapper = document.createElement("div");
-      recordingsWrapper.style.position = "relative";
+      recordingsWrapper.style.cssText = 'position:relative;display:flex';
       const fileManagerBtn = document.createElement("button");
       fileManagerBtn.textContent = "Recordings";
       fileManagerBtn.classList.add("btn");
@@ -1064,7 +1051,7 @@
       const peaksToggleBtn = document.createElement("button");
       peaksToggleBtn.textContent = "Hide Peaks";
       peaksToggleBtn.classList.add("btn");
-      controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn);
+      controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn, fullscreenBtn);
       overlay.appendChild(controlsOverlay);
 
       // Recording timer overlay
