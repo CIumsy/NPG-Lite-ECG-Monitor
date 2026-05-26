@@ -157,7 +157,7 @@
     /* Fullscreen toggle button */
     .fullscreen-btn {
       background: transparent;
-      border: 1.5px solid var(--btn-border);
+      border: 2px solid var(--btn-border);
       color: var(--btn-text);
       width: 36px;
       height: 36px;
@@ -168,6 +168,11 @@
       cursor: pointer;
       pointer-events: auto;
       transition: all 0.2s;
+    }
+
+    .fullscreen-btn:focus,
+    .fullscreen-btn:focus-visible {
+      outline: none;
     }
 
     .fullscreen-btn:hover {
@@ -399,7 +404,7 @@
 
     .btn {
       background: transparent;
-      border: 1.5px solid var(--btn-border);
+      border: 2px solid var(--btn-border);
       color: var(--btn-text);
       width: 40px;
       height: 40px;
@@ -433,6 +438,11 @@
       cursor: not-allowed;
     }
 
+    .btn:focus,
+    .btn:focus-visible {
+      outline: none;
+    }
+
     /* Theme toggle & fullscreen-inside-fullscreen toggle */
     .theme-toggle,
     .fullscreen-theme-toggle {
@@ -443,7 +453,7 @@
       height: 32px;
       border-radius: 50%;
       background: transparent;
-      border: 1.5px solid var(--btn-border);
+      border: 2px solid var(--btn-border);
       color: var(--btn-text);
       display: flex;
       align-items: center;
@@ -452,6 +462,13 @@
       z-index: 99999;
       transition: all 0.3s;
       touch-action: manipulation;
+    }
+
+    .theme-toggle:focus,
+    .theme-toggle:focus-visible,
+    .fullscreen-theme-toggle:focus,
+    .fullscreen-theme-toggle:focus-visible {
+      outline: none;
     }
 
     .theme-toggle:hover,
