@@ -71,18 +71,28 @@
     /* Overlay for timer and BPM */
     .overlay-top {
       position: absolute;
-      top: 15px;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: 20px;
+      left: 15px;
       display: flex;
       gap: 10px;
       align-items: center;
       pointer-events: auto;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: 100%;
-      padding: 0 10px;
-      box-sizing: border-box;
+    }
+
+    /* Fullscreen + theme buttons grouped at bottom-right */
+    .bottom-right-group {
+      position: absolute;
+      bottom: 20px;
+      right: 15px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      pointer-events: auto;
+      z-index: 20;
+    }
+
+    .bottom-right-group .fullscreen-theme-toggle {
+      position: static;
     }
 
     .overlay-metric {
@@ -427,7 +437,7 @@
     .theme-toggle,
     .fullscreen-theme-toggle {
       position: absolute;
-      top: 15px;
+      bottom: 20px;
       right: 15px;
       width: 32px;
       height: 32px;
@@ -462,13 +472,6 @@
     [data-theme="light"] .theme-icon-sun { display: none; }
     [data-theme="light"] .theme-icon-moon { display: block; }
 
-    .fullscreen-theme-toggle {
-      display: none;
-    }
-
-    .canvas-container.fullscreen .fullscreen-theme-toggle {
-      display: flex;
-    }
 
     /* === Mobile layout === */
     /* Portrait: 2×2 button grid */
@@ -580,8 +583,8 @@
   <!-- Fullscreen display container -->
   <div id="deviceContainer"></div>
 
-  <!-- Theme toggle button -->
-  <button class="theme-toggle" aria-label="Toggle theme">
+  <!-- Theme toggle button (hidden — theme is toggled via the overlay button) -->
+  <button class="theme-toggle" aria-label="Toggle theme" style="display:none">
     <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="4"/>
       <path d="M12 2v2"/><path d="M12 20v2"/>
@@ -981,7 +984,7 @@
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
         </svg>
       `;
-      overlay.appendChild(fullscreenThemeToggle);
+      fullscreenThemeToggle.addEventListener('click', toggleTheme);
       // Fullscreen toggle button
       const fullscreenBtn = document.createElement("button");
       fullscreenBtn.classList.add("fullscreen-btn");
@@ -992,6 +995,12 @@
         </svg>
       `;
       fullscreenBtn.addEventListener("click", toggleFullscreen);
+      // Bottom-right group: fullscreen + theme toggle (in fullscreen mode)
+      const bottomRightGroup = document.createElement("div");
+      bottomRightGroup.classList.add("bottom-right-group");
+      bottomRightGroup.appendChild(fullscreenBtn);
+      bottomRightGroup.appendChild(fullscreenThemeToggle);
+      overlay.appendChild(bottomRightGroup);
       // Controls overlay with merged Connect/Disconnect and Toggle Peaks button
       const controlsOverlay = document.createElement("div");
       controlsOverlay.classList.add("controls-overlay");
@@ -1078,7 +1087,7 @@
           <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
           <path d="m2 2 20 20"/>
         </svg>`;
-      controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn, fullscreenBtn);
+      controlsOverlay.append(connectToggleBtn, recordBtnWrapper, recordingsWrapper, peaksToggleBtn);
       overlay.appendChild(controlsOverlay);
 
       // Recording timer overlay
@@ -1141,20 +1150,6 @@
       window._drawGrid = drawGrid;
       drawGrid();
 
-      // Shift the top overlay so the heart's bottom tip sits on the centre
-      // major grid line (always canvasWidth/2 for any NUM_POINTS).
-      // Resetting the transform first forces a synchronous layout so the
-      // measurement and the final apply happen in one pass — no flicker.
-      function alignHeartToGrid() {
-        overlayTop.style.transform = 'translateX(-50%)';
-        const cr = canvasContainer.getBoundingClientRect();
-        const hr = heartIcon.getBoundingClientRect();
-        const delta = (cr.left + cr.width / 2) - (hr.left + hr.width / 2);
-        overlayTop.style.transform = `translateX(calc(-50% + ${delta}px))`;
-      }
-      window._alignHeartToGrid = alignHeartToGrid;
-      requestAnimationFrame(alignHeartToGrid);
-
       // Keep the canvas sharp on window / orientation resize
       const resizeObserver = new ResizeObserver(() => {
         const newDpr = window.devicePixelRatio || 1;
@@ -1173,7 +1168,6 @@
           }
         }
         drawGrid();
-        alignHeartToGrid();
       });
       resizeObserver.observe(canvasContainer);
 
@@ -1890,7 +1884,7 @@
     }
 
     const themeToggle = document.querySelector('.theme-toggle');
-    themeToggle.addEventListener('click', toggleTheme);
+    if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
@@ -1907,12 +1901,6 @@
       }
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
-      const fullscreenThemeToggle = document.querySelector('.fullscreen-theme-toggle');
-      if (fullscreenThemeToggle) {
-        fullscreenThemeToggle.addEventListener('click', toggleTheme);
-      }
-    });
   </script>
 </body>
 
