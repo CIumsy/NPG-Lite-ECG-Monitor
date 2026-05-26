@@ -969,9 +969,6 @@
       // Combined top overlay for timer and BPM
       const overlayTop = document.createElement("div");
       overlayTop.classList.add("overlay-top");
-      const timeDisplay = document.createElement("div");
-      timeDisplay.classList.add("overlay-metric");
-      timeDisplay.textContent = "00:00";
       const bpmDisplay = document.createElement("div");
       bpmDisplay.classList.add("overlay-bpm");
       const heartIcon = document.createElement("div");
@@ -983,7 +980,7 @@
       const dropDisplay = document.createElement("div");
       dropDisplay.classList.add("overlay-metric");
       dropDisplay.style.cssText = "display:none;color:var(--primary);background:rgba(255,56,56,0.18)";
-      overlayTop.append(timeDisplay, bpmDisplay, dropDisplay);
+      overlayTop.append(bpmDisplay, dropDisplay);
       overlay.appendChild(overlayTop);
       // Fullscreen theme toggle button
       const fullscreenThemeToggle = document.createElement("button");
@@ -1210,7 +1207,6 @@
         // Second line for peaks:
         peakLine: null,
         peakLineData: new Array(NUM_POINTS).fill(0),
-        startTime: null,
         notch0: new NotchFilter(),
         ecg0: new ECGFilter(),
         lastBeatTime: 0,
@@ -1346,8 +1342,6 @@
                 }
                 this.connected = false;
                 this.streaming = false;
-                this.startTime = null;
-                timeDisplay.textContent = "00:00";
                 this.updateButtonStates();
                 this.dataCh0.fill(0);
                 this.peakFlags.fill(0);
@@ -1423,8 +1417,6 @@
             this.connected = false;
             this.streaming = false;
             this.updateButtonStates();
-            this.startTime = null;
-            timeDisplay.textContent = "00:00";
             this.dataCh0.fill(0);
             this.peakFlags.fill(0);
             this.sampleIndex = 0;
@@ -1472,8 +1464,6 @@
               this._samplesThisSecond = 0;
             }, 1000);
             console.log("Streaming started.");
-            this.startTime = Date.now();
-            updateMonitoringTime();
           } catch (error) { console.log("Error starting stream: " + error); }
         },
         computeBPM: function () {
@@ -1733,15 +1723,6 @@
       const windowSize = 5;
       let displayedBPM = null;
       const maxChangePerUpdate = 2;
-      function updateMonitoringTime() {
-        if (connection.startTime) {
-          const elapsed = Math.floor((Date.now() - connection.startTime) / 1000);
-          const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
-          const seconds = (elapsed % 60).toString().padStart(2, '0');
-          timeDisplay.textContent = `${minutes}:${seconds}`;
-          requestAnimationFrame(updateMonitoringTime);
-        }
-      }
       setInterval(() => {
         const bpm = connection.computeBPM();
         if (bpm !== null) {
