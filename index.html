@@ -1925,6 +1925,7 @@
       // Download from IndexedDB — assembles per-batch records in order (no full read-back)
       async function downloadFile(filename) {
         try {
+          await (connection._writeQueue || Promise.resolve());
           const db = await connection.openRecordingDB();
           const batches = await new Promise((res, rej) => {
             const req = db.transaction('ECGBatches', 'readonly')
