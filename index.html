@@ -854,6 +854,7 @@
     const DEBOUNCE_TIME = 1000;
     const NUM_POINTS = 2000;
     const SAMPLE_RATE = 500;
+    const MIN_RECORDING_MS = 12000; // minimum recording duration before stop is allowed / recording is saved
 
     // === Pan-Tompkins R-peak Detector (adapted for 500 Hz) ===
     // Algorithm follows the firmware exactly; all timing constants are scaled
@@ -1582,12 +1583,13 @@
           connectToggleBtn.querySelector('.icon-disconnect').style.display = isConn ? 'block' : 'none';
           connectToggleBtn.setAttribute('aria-label', isConn ? 'Disconnect' : 'Connect');
           connectToggleBtn.title = isConn ? 'Disconnect' : 'Connect';
-          recordBtn.disabled = !isConn;
           const isRec = this.isRecording;
+          const recTooShort = isRec && (Date.now() - this.recordingStartTime) < MIN_RECORDING_MS;
+          recordBtn.disabled = !isConn || recTooShort;
           recordBtn.querySelector('.icon-record').style.display = isRec ? 'none'  : 'block';
           recordBtn.querySelector('.icon-stop').style.display   = isRec ? 'block' : 'none';
           recordBtn.setAttribute('aria-label', isRec ? 'Stop recording' : 'Start recording');
-          recordBtn.title = isRec ? 'Stop recording' : 'Record';
+          recordBtn.title = recTooShort ? 'Minimum recording duration: 12 s' : isRec ? 'Stop recording' : 'Record';
           if (isRec) { recordBtn.classList.add("recording"); }
           else        { recordBtn.classList.remove("recording"); }
           const isPaused = this.displayPaused;
@@ -1923,7 +1925,7 @@
           recordingTimer.querySelector('span').textContent = '00:00:00';
           recordingTimer.style.display = "flex";
 
-          // Update timer every second
+          // Update timer every second; also re-evaluates stop-button enable state at 12 s
           this.recordingTimer = setInterval(() => {
             const elapsed = Date.now() - this.recordingStartTime;
             const hours = Math.floor(elapsed / 3600000);
@@ -1931,6 +1933,7 @@
             const seconds = Math.floor((elapsed % 60000) / 1000);
             recordingTimer.querySelector('span').textContent =
               `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            this.updateButtonStates();
           }, 1000);
 
           this.updateButtonStates();
@@ -1939,14 +1942,22 @@
         // Stop recording
         stopRecording: function () {
           this.isRecording = false;
+          const durationMs = Date.now() - this.recordingStartTime;
           if (this.recordingData.length > 0) { this.flushRecordingData(); }
           recordingTimer.style.display = "none";
           clearInterval(this.recordingTimer);
           this.recordingTimer = null;
           this.updateButtonStates();
 
-          // Compute duration
-          const durationMs = Date.now() - this.recordingStartTime;
+          // Discard if below minimum duration — clean up any batches already written to IDB
+          if (durationMs < MIN_RECORDING_MS) {
+            const fn = this.recordingFilename;
+            this._writeQueue = (this._writeQueue || Promise.resolve()).then(() => deleteFile(fn));
+            console.log("Recording discarded (too short):", fn);
+            return;
+          }
+
+          // Compute duration string
           const secs = Math.floor(durationMs / 1000);
           const mm = String(Math.floor(secs / 60)).padStart(2, '0');
           const ss = String(secs % 60).padStart(2, '0');
