@@ -18,6 +18,7 @@
       --btn-bg: transparent;
       --btn-border: rgba(255, 255, 255, 0.75);
       --btn-text: #ffffff;
+      --popup-bg: rgba(8, 14, 28, 0.35);
     }
 
     [data-theme="light"] {
@@ -32,6 +33,7 @@
       --btn-bg: transparent;
       --btn-border: rgba(0, 0, 0, 0.7);
       --btn-text: #000000;
+      --popup-bg: rgba(232, 236, 242, 0.35);
     }
 
     /* Base styles */
@@ -159,8 +161,8 @@
       background: transparent;
       border: 2px solid var(--btn-border);
       color: var(--btn-text);
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -252,20 +254,112 @@
       }
     }
 
+    /* === Info button & panel === */
+    .info-btn-wrapper {
+      position: relative;
+      display: flex;
+    }
+
+    .info-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid var(--btn-border);
+      color: var(--btn-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-style: italic;
+      font-family: Georgia, serif;
+      transition: all 0.2s;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    .info-btn:focus,
+    .info-btn:focus-visible { outline: none; }
+
+    .info-btn:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .info-panel {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      right: 0;
+      background: var(--popup-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--btn-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-width: 180px;
+      z-index: 500;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .info-panel.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .info-panel-title {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+
+    .info-panel table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.74rem;
+      color: var(--text);
+    }
+
+    .info-panel td {
+      padding: 2px 0;
+    }
+
+    .info-panel td:first-child {
+      opacity: 0.55;
+      padding-right: 12px;
+      white-space: nowrap;
+    }
+
+    .info-panel td:last-child {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
     /* File manager modal */
     /* === Recordings dropup === */
     .recordings-dropup {
       position: absolute;
       bottom: calc(100% + 8px);
       left: 0;
-      background: var(--panel-bg);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--popup-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--btn-border);
       border-radius: 12px;
       padding: 10px;
       min-width: 300px;
       max-height: 280px;
       overflow-y: auto;
-      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
       display: none;
       z-index: 500;
     }
@@ -358,8 +452,8 @@
       transform: translateX(-50%) translateY(6px);
       min-width: 220px;
       max-width: 300px;
-      background: rgba(20, 20, 30, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: var(--popup-bg);
+      border: 1px solid var(--btn-border);
       border-left: 3px solid #2ecc71;
       border-radius: 10px;
       padding: 10px 14px;
@@ -367,8 +461,8 @@
       font-size: 0.82rem;
       line-height: 1.6;
       z-index: 2000;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       opacity: 0;
       visibility: hidden;
       transition: opacity 0.3s ease, transform 0.3s ease,
@@ -1006,9 +1100,43 @@
         </svg>
       `;
       fullscreenBtn.addEventListener("click", toggleFullscreen);
-      // Bottom-right group: fullscreen + theme toggle (in fullscreen mode)
+      // Info button — shows scale/timing reference panel
+      const infoBtnWrapper = document.createElement("div");
+      infoBtnWrapper.classList.add("info-btn-wrapper");
+      const infoBtn = document.createElement("button");
+      infoBtn.classList.add("info-btn");
+      infoBtn.setAttribute("aria-label", "Show scale info");
+      infoBtn.textContent = "i";
+      const infoPanel = document.createElement("div");
+      infoPanel.classList.add("info-panel");
+      function buildInfoPanel() {
+        const totalSec  = NUM_POINTS / SAMPLE_RATE;
+        const largeBox  = 100 / SAMPLE_RATE;   // 5 small squares
+        const smallBox  = 20  / SAMPLE_RATE;   // 1 small square
+        infoPanel.innerHTML =
+          `<div class="info-panel-title">Scale reference</div>` +
+          `<table>` +
+          `<tr><td>Display window</td><td>${totalSec} s</td></tr>` +
+          `<tr><td>Large box</td><td>${largeBox.toFixed(2)} s</td></tr>` +
+          `<tr><td>Small box</td><td>${smallBox.toFixed(3)} s</td></tr>` +
+          `<tr><td>Sample rate</td><td>${SAMPLE_RATE} Hz</td></tr>` +
+          `</table>`;
+      }
+      buildInfoPanel();
+      infoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        infoPanel.classList.toggle("open");
+      });
+      document.addEventListener("click", (e) => {
+        if (!infoBtnWrapper.contains(e.target)) infoPanel.classList.remove("open");
+      });
+      infoBtnWrapper.appendChild(infoBtn);
+      infoBtnWrapper.appendChild(infoPanel);
+
+      // Bottom-right group: info + fullscreen + theme toggle (in fullscreen mode)
       const bottomRightGroup = document.createElement("div");
       bottomRightGroup.classList.add("bottom-right-group");
+      bottomRightGroup.appendChild(infoBtnWrapper);
       bottomRightGroup.appendChild(fullscreenBtn);
       bottomRightGroup.appendChild(fullscreenThemeToggle);
       overlay.appendChild(bottomRightGroup);
