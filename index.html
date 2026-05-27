@@ -106,54 +106,44 @@
     }
 
     .overlay-bpm {
-      padding: 8px 16px;
+      padding: 0 16px;
+      height: 40px;
       font-size: 1.2rem;
       font-weight: 700;
-      color: var(--primary);
+      color: var(--btn-text);
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 7px;
       white-space: nowrap;
+      border: 2px solid var(--btn-border);
+      border-radius: 10px;
+      background: transparent;
+    }
+
+    .overlay-bpm span {
+      display: inline-block;
+      min-width: 4.5em;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
 
     .heart-icon {
-      width: 14px;
-      height: 14px;
-      background-color: var(--primary);
-      transform: scale(0.8) rotate(45deg);
-      position: relative;
-      opacity: 1;
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      overflow: visible;
     }
 
-    /* Heartbeat animation triggered on peak detection */
-    .heart-icon.beating {
-      animation: beat 0.3s ease;
+    .heart-icon path {
+      fill: transparent;
+      stroke: var(--btn-border);
+      stroke-width: 2;
+      stroke-linejoin: round;
+      transition: fill 0.15s ease-out;
     }
 
-    @keyframes beat {
-      0%   { transform: scale(0.8) rotate(45deg); }
-      50%  { transform: scale(1.1) rotate(45deg); }
-      100% { transform: scale(0.8) rotate(45deg); }
-    }
-
-    .heart-icon:before,
-    .heart-icon:after {
-      content: "";
-      width: 14px;
-      height: 14px;
-      background-color: var(--primary);
-      border-radius: 50%;
-      position: absolute;
-    }
-
-    .heart-icon:before {
-      top: -7px;
-      left: 0;
-    }
-
-    .heart-icon:after {
-      top: 0;
-      left: -7px;
+    .heart-icon.beating path {
+      fill: var(--primary);
     }
 
     /* Fullscreen toggle button */
@@ -702,28 +692,15 @@
       }
 
       .overlay-bpm {
-        padding: 6px 12px;
+        padding: 0 12px;
+        height: 36px;
         font-size: 1rem;
-        gap: 6px;
+        gap: 3px;
       }
 
       .heart-icon {
-        width: 14px;
-        height: 14px;
-      }
-
-      .heart-icon:before,
-      .heart-icon:after {
-        width: 14px;
-        height: 14px;
-      }
-
-      .heart-icon:before {
-        top: -7px;
-      }
-
-      .heart-icon:after {
-        left: -7px;
+        width: 22px;
+        height: 22px;
       }
 
       .btn {
@@ -1170,8 +1147,12 @@
       overlayTop.classList.add("overlay-top");
       const bpmDisplay = document.createElement("div");
       bpmDisplay.classList.add("overlay-bpm");
-      const heartIcon = document.createElement("div");
+      const heartIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      heartIcon.setAttribute("viewBox", "0 0 24 24");
       heartIcon.classList.add("heart-icon");
+      const _heartPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      _heartPath.setAttribute("d", "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z");
+      heartIcon.appendChild(_heartPath);
       bpmDisplay.appendChild(heartIcon);
       const bpmText = document.createElement("span");
       bpmText.textContent = "-- BPM";
@@ -1829,11 +1810,9 @@
           return (bpm >= 40 && bpm <= 120) ? bpm : null;
         },
         triggerHeartbeat: function () {
-          // Sync heartbeat animation with each detected peak
-          heartIcon.classList.remove("beating");
-          // Trigger reflow to restart animation
-          void heartIcon.offsetWidth;
           heartIcon.classList.add("beating");
+          clearTimeout(this._heartbeatTimer);
+          this._heartbeatTimer = setTimeout(() => heartIcon.classList.remove("beating"), 200);
         },
         updateBPMDisplay: function (bpm) {
           if (bpm !== null) {
