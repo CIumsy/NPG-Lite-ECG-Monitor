@@ -2030,25 +2030,32 @@
         const peaks = vd.peaks;
         const off   = vd.offset;
         const total = vd.total;
-        let bSum = 0, bN = 0;
+
+        // ECG line
         for (let i = 0; i < NUM_POINTS; i++) {
           const si = off + i;
-          if (si < total) { bSum += snap[si]; bN++; }
+          connection.line0.setY(i, si < total ? snap[si] : 0);
         }
-        const baseline = bN > 0 ? bSum / bN : 0;
+
+        // Peak markers — search PEAK_HALF_WIDTH beyond each edge so a peak that falls
+        // just outside the window still renders its partial ⊓ into the visible area.
         peakDisplay.fill(NaN);
-        for (let i = 0; i < NUM_POINTS; i++) {
-          const si = off + i;
-          const y = si < total ? snap[si] : 0;
-          connection.line0.setY(i, y);
-          if (peaks && connection.peaksVisible && si < total && peaks[si] && y > baseline) {
-            const lo = Math.max(0, i - PEAK_HALF_WIDTH);
-            const hi = Math.min(NUM_POINTS - 1, i + PEAK_HALF_WIDTH);
+        if (peaks && connection.peaksVisible) {
+          const searchStart = Math.max(0, off - PEAK_HALF_WIDTH);
+          const searchEnd   = Math.min(total, off + NUM_POINTS + PEAK_HALF_WIDTH);
+          for (let si = searchStart; si < searchEnd; si++) {
+            if (!peaks[si]) continue;
+            const y = snap[si];
+            const center = si - off; // screen column (may be <0 or ≥NUM_POINTS near edges)
+            const lo = Math.max(0, center - PEAK_HALF_WIDTH);
+            const hi = Math.min(NUM_POINTS - 1, center + PEAK_HALF_WIDTH);
+            if (lo > hi) continue;
             peakDisplay[lo] = y - 0.08;
             for (let j = lo + 1; j < hi; j++) peakDisplay[j] = y;
             peakDisplay[hi] = y - 0.08;
           }
         }
+
         for (let i = 0; i < NUM_POINTS; i++) {
           connection.peakLine.setY(i, peakDisplay[i]);
         }
@@ -2084,7 +2091,7 @@
         for (let i = 0; i < NUM_POINTS; i++) {
           const inGap = ((i - head + NUM_POINTS) % NUM_POINTS) < GAP_WIDTH;
           connection.line0.setY(i, inGap ? NaN : d[i]);
-          if (!inGap && connection.peakFlags[i]) {
+          if (connection.peakFlags[i]) {
             const y = d[i];
             if (y > baseline) {
               const topY = y;
@@ -2097,10 +2104,9 @@
             }
           }
         }
-        // Pass 2: write peak line (also blank within the sweep gap)
+        // Pass 2: write peak line — no gap blanking so markers persist until data is overwritten
         for (let i = 0; i < NUM_POINTS; i++) {
-          connection.peakLine.setY(i,
-            ((i - head + NUM_POINTS) % NUM_POINTS) < GAP_WIDTH ? NaN : peakDisplay[i]);
+          connection.peakLine.setY(i, peakDisplay[i]);
         }
         connection.wglp.update();
       }
