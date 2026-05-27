@@ -1470,27 +1470,29 @@
               }
             });
 
-            // gatt.connect() can resolve before the stack is fully ready,
-            // especially right after a recent disconnect. Retry with backoff.
+            // gatt.connect() can resolve before the stack is fully ready;
+            // getPrimaryService/getCharacteristic can also fail on a settled connection.
+            // Retry the full discovery block and tear down any partial session first.
             console.log("Connecting to GATT Server...");
+            let service;
             for (let attempt = 1; attempt <= 3; attempt++) {
               try {
                 this.server = await this.device.gatt.connect();
-                if (this.server.connected) break;
-                throw new Error("Not connected after gatt.connect()");
+                if (!this.server.connected) throw new Error("Not connected after gatt.connect()");
+                console.log("Getting Service...");
+                service = await this.server.getPrimaryService(SERVICE_UUID);
+                console.log("Getting Control Characteristic...");
+                this.controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
+                console.log("Getting Data Characteristic...");
+                this.dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
+                break;
               } catch (e) {
+                try { this.device?.gatt?.disconnect(); } catch (_) { /* ignore */ }
                 if (attempt === 3) throw e;
                 console.log(`Connection attempt ${attempt} failed, retrying in ${attempt}s...`);
                 await new Promise(r => setTimeout(r, attempt * 1000));
               }
             }
-
-            console.log("Getting Service...");
-            const service = await this.server.getPrimaryService(SERVICE_UUID);
-            console.log("Getting Control Characteristic...");
-            this.controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
-            console.log("Getting Data Characteristic...");
-            this.dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
             // Detect packet format from device name
             const devName = this.device.name || '';
             if (devName.includes('6CH')) {
