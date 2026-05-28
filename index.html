@@ -832,6 +832,7 @@
     const NUM_POINTS = 2000;
     const SAMPLE_RATE = 500;
     const MIN_RECORDING_MS = 12000; // minimum recording duration before stop is allowed / recording is saved
+    const SQI_FLAT_THRESHOLD = 1e-4; // EMA power below this → flat-line / electrodes off
 
     // === Pan-Tompkins R-peak Detector (adapted for 500 Hz) ===
     // Algorithm follows the firmware exactly; all timing constants are scaled
@@ -1557,6 +1558,9 @@
         worker: null,
         recordingDurationLimit: null, // in milliseconds, null = unlimited
         totalRecordedSamples: 0,
+        _sqiPower: 0,
+        signalGood: false,
+        _flatlineSamples: 0,
 
         updateButtonStates: function () {
           const isConn = this.connected;
@@ -1612,13 +1616,30 @@
           this.peakFlags[writePos] = 0;       // clear stale flag for this slot
           const rawCh0 = dataView.getInt16(1, false);
           let normCh0 = this.normalizeSample(Math.max(0, Math.min(4096, rawCh0)));
+          // EMA of pre-filter signal power — drops to ~0 when electrodes are off / flat line
+          const wasGood = this.signalGood;
+          this._sqiPower = 0.999 * this._sqiPower + 0.001 * normCh0 * normCh0;
+          this.signalGood = this._sqiPower > SQI_FLAT_THRESHOLD;
+          if (!this.signalGood) {
+            if (this._flatlineSamples < 65535) this._flatlineSamples++;
+          } else {
+            if (!wasGood && this._flatlineSamples > 250) {
+              // ECG returned after 500+ms of no signal — recalibrate from scratch so
+              // late electrode connection doesn't inherit a flat-line learning phase
+              this.panTompkins.reset();
+              this.sampleIndex = 0;
+              this.dataCh0.fill(0);
+              this.peakFlags.fill(0);
+            }
+            this._flatlineSamples = 0;
+          }
           normCh0 = this.ecg0.process(this.notch0.process(normCh0));
           this.dataCh0[writePos] = normCh0;
           this.sampleIndex = (this.sampleIndex + 1) % NUM_POINTS;
 
           // Pan-Tompkins detection (operates on the filtered sample)
           const rTime = this.panTompkins.process(normCh0);
-          if (rTime !== null) {
+          if (rTime !== null && this.signalGood) {
             this.peakFlags[rTime % NUM_POINTS] = 1;
             this.triggerHeartbeat();
           }
@@ -1765,6 +1786,9 @@
             this.peakFlags.fill(0);
             this.sampleIndex = 0;
             this.panTompkins.reset();
+            this._sqiPower = 0;
+            this.signalGood = false;
+            this._flatlineSamples = 0;
             bpmText.textContent = "-- BPM";
             console.log("Device disconnected.");
           }
@@ -1782,6 +1806,9 @@
             this.peakFlags.fill(0);
             this.prevSampleCounter = null;
             this.droppedSamples = 0;
+            this._sqiPower = 0;
+            this.signalGood = false;
+            this._flatlineSamples = 0;
             console.log("Sending START command...");
             await this.controlChar.writeValue(new TextEncoder().encode("START"));
             console.log("Starting notifications...");
@@ -1825,8 +1852,6 @@
           console.log("Streaming stopped.");
         },
         computeBPM: function () {
-          // Valid physiological range: 40–120 BPM.
-          // Outside this range the reading is unreliable — show '--'.
           const bpm = this.panTompkins.bpm;
           return (bpm >= 40 && bpm <= 120) ? bpm : null;
         },
