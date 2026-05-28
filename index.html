@@ -1580,9 +1580,14 @@
           pauseBtn.title = isPaused ? 'Resume' : 'Pause';
           pauseBtn.disabled = !isConn;
         },
-        toggleDisplayPause: function () {
+        toggleDisplayPause: async function () {
           this.displayPaused = !this.displayPaused;
           this.updateButtonStates();
+          if (this.displayPaused) {
+            await this.stopStream();
+          } else {
+            await this.startStream();
+          }
         },
         normalizeSample: function (sample) {
           const ADC_MAX = 4096;
@@ -1802,6 +1807,22 @@
             }, 1000);
             console.log("Streaming started.");
           } catch (error) { console.log("Error starting stream: " + error); }
+        },
+        stopStream: async function () {
+          if (this._dataCheckInterval) {
+            clearInterval(this._dataCheckInterval);
+            this._dataCheckInterval = null;
+          }
+          if (this.dataChar && this._notifHandler) {
+            this.dataChar.removeEventListener("characteristicvaluechanged", this._notifHandler);
+            try { await this.dataChar.stopNotifications(); } catch (e) { /* ignore */ }
+          }
+          if (this.controlChar) {
+            try { await this.controlChar.writeValue(new TextEncoder().encode("STOP")); } catch (e) { /* ignore */ }
+          }
+          this.streaming = false;
+          bpmText.textContent = "-- BPM";
+          console.log("Streaming stopped.");
         },
         computeBPM: function () {
           // Valid physiological range: 40–120 BPM.
@@ -2313,6 +2334,7 @@
       // Open a saved recording in the scrubber viewer
       async function openRecordingViewer(filename) {
         try {
+          if (connection.streaming) await connection.stopStream();
           await (connection._writeQueue || Promise.resolve());
           const db = await connection.openRecordingDB();
           const batches = await new Promise((res, rej) => {
@@ -2376,6 +2398,10 @@
           connection.peakLine.setY(i, NaN);
         }
         connection.wglp.update();
+        // Restart live stream if still connected and not manually paused
+        if (connection.connected && !connection.displayPaused) {
+          connection.startStream();
+        }
       }
 
       viewerCloseBtn.addEventListener('click', closeRecordingViewer);
