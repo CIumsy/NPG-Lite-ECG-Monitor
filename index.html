@@ -833,6 +833,7 @@
     const SAMPLE_RATE = 500;
     const MIN_RECORDING_MS = 12000; // minimum recording duration before stop is allowed / recording is saved
     const SQI_FLAT_THRESHOLD = 1e-4; // EMA power below this → flat-line / electrodes off
+    const RR_CV_THRESHOLD = 0.25;    // RR-interval coefficient of variation above this → noise, not ECG
 
     // === Pan-Tompkins R-peak Detector (adapted for 500 Hz) ===
     // Algorithm follows the firmware exactly; all timing constants are scaled
@@ -967,6 +968,23 @@
         let sum = 0;
         for (let i = 0; i < this.bpmHN; i++) sum += this.bpmHist[i];
         this.bpm = (60 * this.fs) / (sum / this.bpmHN);
+      }
+
+      // Coefficient of variation of recent RR intervals.
+      // Real ECG: CV typically < 0.15. Random noise: CV > 0.30.
+      // Returns 1.0 (treated as "bad") until at least 4 intervals are recorded.
+      _rrCV() {
+        if (this.bpmHN < 4) return 1.0;
+        let sum = 0;
+        for (let i = 0; i < this.bpmHN; i++) sum += this.bpmHist[i];
+        const mean = sum / this.bpmHN;
+        if (mean <= 0) return 1.0;
+        let sumSq = 0;
+        for (let i = 0; i < this.bpmHN; i++) {
+          const d = this.bpmHist[i] - mean;
+          sumSq += d * d;
+        }
+        return Math.sqrt(sumSq / this.bpmHN) / mean;
       }
 
       _slopeAround(timeCenter, halfWin) {
@@ -1560,6 +1578,7 @@
         totalRecordedSamples: 0,
         _sqiPower: 0,
         signalGood: false,
+        signalRegular: false,
         _flatlineSamples: 0,
 
         updateButtonStates: function () {
@@ -1639,7 +1658,11 @@
 
           // Pan-Tompkins detection (operates on the filtered sample)
           const rTime = this.panTompkins.process(normCh0);
-          if (rTime !== null && this.signalGood) {
+          // RR-interval coefficient of variation distinguishes real ECG (regular intervals,
+          // CV < 0.15) from floating-wire noise that triggers Pan-Tompkins on random spikes
+          // (CV > 0.30). Needs ≥4 intervals before it returns a meaningful value.
+          this.signalRegular = this.panTompkins._rrCV() < RR_CV_THRESHOLD;
+          if (rTime !== null && this.signalGood && this.signalRegular) {
             this.peakFlags[rTime % NUM_POINTS] = 1;
             this.triggerHeartbeat();
           }
@@ -1788,6 +1811,7 @@
             this.panTompkins.reset();
             this._sqiPower = 0;
             this.signalGood = false;
+            this.signalRegular = false;
             this._flatlineSamples = 0;
             bpmText.textContent = "-- BPM";
             console.log("Device disconnected.");
@@ -1808,6 +1832,7 @@
             this.droppedSamples = 0;
             this._sqiPower = 0;
             this.signalGood = false;
+            this.signalRegular = false;
             this._flatlineSamples = 0;
             console.log("Sending START command...");
             await this.controlChar.writeValue(new TextEncoder().encode("START"));
@@ -1852,6 +1877,7 @@
           console.log("Streaming stopped.");
         },
         computeBPM: function () {
+          if (!this.signalRegular) return null;
           const bpm = this.panTompkins.bpm;
           return (bpm >= 40 && bpm <= 120) ? bpm : null;
         },
