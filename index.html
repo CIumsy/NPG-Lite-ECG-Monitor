@@ -81,6 +81,27 @@
       pointer-events: auto;
     }
 
+    /* UDL logo — top left */
+    .udl-logo {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: block;
+      pointer-events: auto;
+      z-index: 20;
+      line-height: 0;
+    }
+
+    .udl-logo img {
+      height: 48px;
+      width: auto;
+    }
+
+    .udl-logo .logo-dark  { display: block; }
+    .udl-logo .logo-light { display: none;  }
+    [data-theme="light"] .udl-logo .logo-dark  { display: none;  }
+    [data-theme="light"] .udl-logo .logo-light { display: block; }
+
     /* Fullscreen + theme buttons grouped at bottom-right */
     .bottom-right-group {
       position: absolute;
@@ -1215,6 +1236,16 @@
       // Create overlay container for overlays
       const overlay = document.createElement("div");
       overlay.classList.add("canvas-overlay");
+      // UDL logo — top left, theme-aware
+      const udlLogo = document.createElement("a");
+      udlLogo.classList.add("udl-logo");
+      udlLogo.href = "https://upsidedownlabs.tech/";
+      udlLogo.target = "_blank";
+      udlLogo.rel = "noopener noreferrer";
+      udlLogo.innerHTML = `
+        <img class="logo-dark"  src="udl_logo_white.svg" alt="Upside Down Labs">
+        <img class="logo-light" src="udl_logo_black.svg" alt="Upside Down Labs">`;
+      overlay.appendChild(udlLogo);
       // Combined top overlay for timer and BPM
       const overlayTop = document.createElement("div");
       overlayTop.classList.add("overlay-top");
