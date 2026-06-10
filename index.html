@@ -188,11 +188,18 @@
       outline: none;
     }
 
-    .fullscreen-btn:hover {
+    @media (hover: hover) {
+      .fullscreen-btn:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        transform: scale(1.15);
+      }
+    }
+    .fullscreen-btn:active {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
-      transform: scale(1.15);
     }
 
     .fullscreen-btn svg {
@@ -404,7 +411,14 @@
     .info-btn:focus,
     .info-btn:focus-visible { outline: none; }
 
-    .info-btn:hover {
+    @media (hover: hover) {
+      .info-btn:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+    }
+    .info-btn:active {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
@@ -516,9 +530,10 @@
       transition: background 0.15s;
     }
 
-    .file-item:hover {
-      background: rgba(128, 128, 128, 0.16);
+    @media (hover: hover) {
+      .file-item:hover { background: rgba(128, 128, 128, 0.16); }
     }
+    .file-item:active { background: rgba(128, 128, 128, 0.16); }
 
     .file-name {
       color: var(--text);
@@ -548,11 +563,18 @@
       transition: all 0.15s;
     }
 
-    .file-action-btn:hover {
+    @media (hover: hover) {
+      .file-action-btn:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        transform: scale(1.05);
+      }
+    }
+    .file-action-btn:active {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
-      transform: scale(1.05);
     }
 
     .no-files {
@@ -648,14 +670,22 @@
     /* SVG files loaded via <img> resolve currentColor as black — dark mode is default so invert by default */
     .btn img { filter: invert(1); }
     [data-theme="light"] .btn img { filter: none; }
-    [data-theme="light"] .btn:hover:not(:disabled) img { filter: invert(1); }
 
-    .btn:hover:not(:disabled) {
+    @media (hover: hover) {
+      [data-theme="light"] .btn:hover:not(:disabled) img { filter: invert(1); }
+      .btn:hover:not(:disabled) {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        transform: translateY(-2px);
+      }
+    }
+    .btn:active:not(:disabled) {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
-      transform: translateY(-2px);
     }
+    [data-theme="light"] .btn:active:not(:disabled) img { filter: invert(1); }
 
     .btn:disabled {
       opacity: 0.6;
@@ -695,12 +725,20 @@
       outline: none;
     }
 
-    .theme-toggle:hover,
-    .fullscreen-theme-toggle:hover {
+    @media (hover: hover) {
+      .theme-toggle:hover,
+      .fullscreen-theme-toggle:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        transform: scale(1.1);
+      }
+    }
+    .theme-toggle:active,
+    .fullscreen-theme-toggle:active {
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
-      transform: scale(1.1);
     }
 
     .theme-toggle svg,
