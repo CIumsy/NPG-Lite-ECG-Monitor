@@ -741,6 +741,23 @@
       color: #fff;
     }
 
+    /* Neutralize all hover styles on actual touch devices (JS sets this class on first touchstart) */
+    .is-touch-device .btn:hover:not(:disabled),
+    .is-touch-device .fullscreen-btn:hover,
+    .is-touch-device .info-btn:hover,
+    .is-touch-device .theme-toggle:hover,
+    .is-touch-device .fullscreen-theme-toggle:hover,
+    .is-touch-device .file-action-btn:hover,
+    .is-touch-device .file-item:hover {
+      background: transparent !important;
+      border-color: var(--btn-border) !important;
+      color: var(--btn-text) !important;
+      transform: none !important;
+    }
+    .is-touch-device [data-theme="light"] .btn:hover:not(:disabled) img {
+      filter: none !important;
+    }
+
     .theme-toggle svg,
     .fullscreen-theme-toggle svg {
       width: 20px;
@@ -2753,6 +2770,11 @@
     if (savedTheme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
     }
+
+    // Detect real touch usage and suppress hover side-effects on touch devices
+    window.addEventListener('touchstart', () => {
+      document.documentElement.classList.add('is-touch-device');
+    }, { once: true, passive: true });
 
     createDevicePanel();
 
