@@ -130,8 +130,8 @@
 
     /* Disconnect button lives in the top-right group — match tool-button size */
     .bottom-right-group .btn {
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 50%;
     }
     .bottom-right-group .btn svg {
@@ -193,8 +193,8 @@
       background: transparent;
       border: 2px solid var(--btn-border);
       color: var(--btn-text);
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -402,8 +402,8 @@
     }
 
     .info-btn {
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 50%;
       background: transparent;
       border: 2px solid var(--btn-border);
@@ -727,8 +727,8 @@
       position: absolute;
       bottom: 1.25rem;
       right: 1rem;
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 50%;
       background: transparent;
       border: 2px solid var(--btn-border);
@@ -845,27 +845,27 @@
         gap: 0;
       }
 
-      /* Normal buttons: slightly larger */
-      .btn     { width: 2.75rem; height: 2.75rem; }
-      .btn svg { width: 1.375rem; height: 1.375rem; }
-      .btn img { width: 1.375rem; height: 1.375rem; }
+      /* Normal buttons: match BPM bar height (2rem) */
+      .btn     { width: 2rem; height: 2rem; }
+      .btn svg { width: 1rem; height: 1rem; }
+      .btn img { width: 1rem; height: 1rem; }
 
-      /* Center connect button: 1.5× of 2.75rem */
-      .btn-connect-center              { width: 4.125rem; height: 4.125rem; border-radius: 0.625rem; }
+      /* Center connect button: 1.5× of 2rem */
+      .btn-connect-center              { width: 3rem; height: 3rem; border-radius: 0.625rem; }
       .btn-connect-center svg,
-      .btn-connect-center img          { width: 2rem; height: 2rem; }
+      .btn-connect-center img          { width: 1.5rem; height: 1.5rem; }
 
       /* Viewer header: below BPM (BPM top 1rem + height 2rem = 3rem, add gap) */
       .viewer-header { top: 3.5rem; }
 
-      /* Recording timer + minimap: above tallest button (0.875 + 4.125 + 0.75 = 5.75rem) */
-      .recording-timer { bottom: 5.75rem; font-size: 0.82rem; }
-      .minimap-wrap    { bottom: 5.75rem; }
+      /* Recording timer + minimap: above tallest button (0.875 + 3rem + 0.75 = 4.625rem) */
+      .recording-timer { bottom: 4.625rem; font-size: 0.82rem; }
+      .minimap-wrap    { bottom: 4.625rem; }
 
       /* Dropup: fixed so it never clips off-screen */
       .recordings-dropup {
         position: fixed;
-        bottom: 5.75rem;
+        bottom: 4.625rem;
         left: 0.625rem;
         right: 0.625rem;
         min-width: unset;
@@ -875,7 +875,7 @@
       /* Toast: full-width fixed pill */
       .rec-toast {
         position: fixed;
-        bottom: 5.75rem;
+        bottom: 4.625rem;
         left: 0.75rem;
         right: 0.75rem;
         transform: translateY(0.375rem);
@@ -899,18 +899,18 @@
       .info-btn                    { width: 1.75rem; height: 1.75rem; font-size: 0.72rem; }
       .bottom-right-group .btn     { width: 1.75rem; height: 1.75rem; }
       .bottom-right-group .btn svg { width: 0.875rem; height: 0.875rem; }
-      /* Slightly smaller buttons on very small screens */
-      .btn     { width: 2.5rem; height: 2.5rem; }
-      .btn svg { width: 1.25rem; height: 1.25rem; }
-      .btn img { width: 1.25rem; height: 1.25rem; }
-      .btn-connect-center { width: 3.75rem; height: 3.75rem; }
+      /* Match BPM bar height (2rem) on very small screens */
+      .btn     { width: 2rem; height: 2rem; }
+      .btn svg { width: 1rem; height: 1rem; }
+      .btn img { width: 1rem; height: 1rem; }
+      .btn-connect-center { width: 3rem; height: 3rem; }
       .btn-connect-center svg,
-      .btn-connect-center img { width: 1.875rem; height: 1.875rem; }
-      /* Recording timer + minimap: above tallest button (0.875 + 3.75 + 0.75 = 5.375rem) */
-      .recording-timer { bottom: 5.375rem; }
-      .minimap-wrap    { bottom: 5.375rem; }
-      .recordings-dropup { bottom: 5.375rem; }
-      .rec-toast { bottom: 5.375rem; }
+      .btn-connect-center img { width: 1.5rem; height: 1.5rem; }
+      /* Recording timer + minimap: above tallest button (0.875 + 3rem + 0.75 = 4.625rem) */
+      .recording-timer { bottom: 4.625rem; }
+      .minimap-wrap    { bottom: 4.625rem; }
+      .recordings-dropup { bottom: 4.625rem; }
+      .rec-toast { bottom: 4.625rem; }
       .overlay-bpm  { font-size: 0.82rem; padding: 0 0.375rem; height: 2rem; }
       .overlay-bpm span { min-width: 3.8em; }
       .udl-logo img { height: 1.875rem; }
