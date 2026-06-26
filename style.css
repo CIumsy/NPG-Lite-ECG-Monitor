@@ -1009,6 +1009,34 @@ canvas {
   .viewer-duration { font-size: 0.66rem; }
 }
 
+/* ── Fullscreen on phone (landscape locked, height ≤ 500 px) ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Button sizes: slightly larger than the base landscape values */
+  .canvas-container.fullscreen .btn          { width: 2.25rem; height: 2.25rem; }
+  .canvas-container.fullscreen .btn svg      { width: 1.125rem; height: 1.125rem; }
+  .canvas-container.fullscreen .btn img      { width: 1.125rem; height: 1.125rem; }
+  .canvas-container.fullscreen .btn-connect-center     { width: 3.25rem; height: 3.25rem; }
+  .canvas-container.fullscreen .btn-connect-center svg,
+  .canvas-container.fullscreen .btn-connect-center img { width: 1.625rem; height: 1.625rem; }
+
+  /* More breathing room between bottom buttons */
+  .canvas-container.fullscreen .controls-overlay { gap: 0.875rem; }
+
+  /* Top-right circle buttons */
+  .canvas-container.fullscreen .fullscreen-theme-toggle,
+  .canvas-container.fullscreen .fullscreen-btn     { width: 2.25rem; height: 2.25rem; }
+  .canvas-container.fullscreen .fullscreen-theme-toggle svg,
+  .canvas-container.fullscreen .fullscreen-btn svg { width: 1.125rem; height: 1.125rem; }
+  .canvas-container.fullscreen .info-btn                    { width: 2.25rem; height: 2.25rem; }
+  .canvas-container.fullscreen .bottom-right-group .btn     { width: 2.25rem; height: 2.25rem; }
+  .canvas-container.fullscreen .bottom-right-group .btn svg { width: 1.125rem; height: 1.125rem; }
+
+  /* Recalculate: controls_bottom(0.5) + connect_height(3.25) + clearance(0.75) = 4.5rem */
+  .canvas-container.fullscreen .recording-timer            { bottom: 4.5rem; }
+  .canvas-container.fullscreen .minimap-wrap               { bottom: 4.5rem; }
+  .canvas-container.fullscreen .recordings-dropup.timer-active { bottom: 7rem; }
+}
+
 /* ── Tablets portrait  601 – 900 px ─────────────────── */
 @media (min-width: 601px) and (max-width: 900px) and (orientation: portrait) {
   .udl-logo img     { height: 2.625rem; }
