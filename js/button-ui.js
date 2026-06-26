@@ -434,6 +434,12 @@ function createDevicePanel() {
 
   fileManagerBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    // Dismiss any active toast immediately when opening the recordings panel
+    if (!dropup.classList.contains("open")) {
+      clearTimeout(_toastTimer);
+      _toastTimer = null;
+      recToast.classList.remove("show");
+    }
     refreshDropup();
     dropup.classList.toggle("open");
   });
@@ -498,11 +504,15 @@ function updateButtonStates() {
   // Find record button by its icon-record child
   document.querySelectorAll('.controls-overlay .btn').forEach(btn => {
     if (!btn.querySelector('.icon-record')) return;
-    btn.disabled = !isConn || recTooShort || isViewer || isPaused;
+    btn.disabled = !isConn || isViewer || isPaused;
+    // Visually lock during first 12 s but keep pointer events so a click shows the toast
+    btn.classList.toggle('recording-locked', recTooShort);
+    if (recTooShort) btn.dataset.tip = 'Minimum recording duration: 12 s';
+    else delete btn.dataset.tip;
     btn.querySelector('.icon-record').style.display = isRec ? 'none'  : 'block';
     btn.querySelector('.icon-stop').style.display   = isRec ? 'block' : 'none';
     btn.setAttribute('aria-label', isRec ? 'Stop recording' : 'Start recording');
-    btn.title = recTooShort ? 'Minimum recording duration: 12 s' : isRec ? 'Stop recording' : 'Record';
+    btn.title = isRec ? 'Stop recording' : 'Record';
     if (isRec) btn.classList.add("recording");
     else        btn.classList.remove("recording");
   });

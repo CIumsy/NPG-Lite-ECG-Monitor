@@ -118,6 +118,10 @@ function stopRecording() {
     const fn = connection.recordingFilename;
     connection._writeQueue = (connection._writeQueue || Promise.resolve())
       .then(() => deleteFile(fn));
+    showToast(
+      `<strong style="color:var(--primary)">Recording too short</strong>` +
+      `Minimum duration is ${MIN_RECORDING_MS / 1000} s — recording discarded.`
+    );
     console.log("Recording discarded (too short):", fn);
     return;
   }
@@ -147,6 +151,17 @@ function stopRecording() {
 
 function toggleRecording() {
   if (connection.isRecording) {
+    const elapsed = Date.now() - connection.recordingStartTime;
+    if (elapsed < MIN_RECORDING_MS) {
+      // Show a brief tooltip near the button (mirrors the PC hover title on touch devices)
+      const btn = document.querySelector('.recording-locked');
+      if (btn) {
+        btn.classList.add('show-tip');
+        clearTimeout(btn._tipTimer);
+        btn._tipTimer = setTimeout(() => btn.classList.remove('show-tip'), 2000);
+      }
+      return;
+    }
     stopRecording();
   } else {
     startRecording();
