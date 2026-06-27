@@ -702,6 +702,24 @@ canvas {
 .btn img { filter: invert(1); }
 [data-theme="light"] .btn img { filter: none; }
 
+/* Peak marker icon: landscape SVG — fill button width and let height scale naturally */
+.btn .icon-peaks { width: 88%; height: auto; }
+
+/* Diagonal slash when peaks are hidden */
+.btn.peaks-off::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  height: 2px;
+  background: var(--primary);
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+  border-radius: 1px;
+  z-index: 1;
+}
+
 @media (hover: hover) {
   [data-theme="light"] .btn:hover:not(:disabled):not(.recording-locked) img { filter: invert(1); }
   .btn:hover:not(:disabled):not(.recording-locked) {

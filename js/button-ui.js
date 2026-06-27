@@ -216,6 +216,10 @@ function createDevicePanel() {
     if (!recordingsWrapper.contains(e.target) && !dropup.contains(e.target))
       dropup.classList.remove("open");
   });
+  // Prevent scroll/swipe events inside the panel from falling through to the recording viewer
+  dropup.addEventListener("wheel",      (e) => e.stopPropagation(), { passive: true });
+  dropup.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+  dropup.addEventListener("touchmove",  (e) => e.stopPropagation(), { passive: true });
   const recToast = document.createElement("div");
   recToast.classList.add("rec-toast");
   recordingsWrapper.appendChild(fileManagerBtn);
@@ -225,17 +229,7 @@ function createDevicePanel() {
   peaksToggleBtn.classList.add("btn");
   peaksToggleBtn.setAttribute("aria-label", "Hide peaks");
   peaksToggleBtn.title = "Hide peaks";
-  peaksToggleBtn.innerHTML = `
-    <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-    <svg class="icon-eye-off" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
-      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
-      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
-      <path d="m2 2 20 20"/>
-    </svg>`;
+  peaksToggleBtn.innerHTML = `<img class="icon-peaks" src="icons/peak-marker-icon.svg" alt="Peaks">`;
 
   // DC filter toggle
   const dcToggleBtn = document.createElement("button");
@@ -649,18 +643,16 @@ function togglePeaks() {
     const c = getPeakColor();
     connection.peakLine.color = new ColorRGBA(c[0], c[1], c[2], 1);
     document.querySelectorAll('.btn').forEach(btn => {
-      if (!btn.querySelector('.icon-eye')) return;
-      btn.querySelector('.icon-eye').style.display     = 'block';
-      btn.querySelector('.icon-eye-off').style.display = 'none';
+      if (!btn.querySelector('.icon-peaks')) return;
+      btn.classList.remove('peaks-off');
       btn.setAttribute('aria-label', 'Hide peaks');
       btn.title = 'Hide peaks';
     });
   } else {
     connection.peakLine.color = new ColorRGBA(0, 0, 0, 0);
     document.querySelectorAll('.btn').forEach(btn => {
-      if (!btn.querySelector('.icon-eye')) return;
-      btn.querySelector('.icon-eye').style.display     = 'none';
-      btn.querySelector('.icon-eye-off').style.display = 'block';
+      if (!btn.querySelector('.icon-peaks')) return;
+      btn.classList.add('peaks-off');
       btn.setAttribute('aria-label', 'Show peaks');
       btn.title = 'Show peaks';
     });
