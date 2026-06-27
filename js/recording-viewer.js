@@ -202,7 +202,10 @@ async function openRecordingViewer(filename) {
     connection.viewerActive = true;
     updateButtonStates();
 
-    // Update viewer header
+    // Hide BPM display — viewer header takes its place
+    connection.elements.bpmDisplay.style.display = 'none';
+
+    // Update viewer header (filename, duration, download, close)
     connection.elements.viewerFilenameEl.textContent = filename;
     connection.elements.viewerDurationEl.textContent =
       `${mm}:${ss} · ${total.toLocaleString()} samples`;
@@ -224,6 +227,10 @@ function closeRecordingViewer() {
   connection.viewerActive = false;
   connection.viewerData   = null;
   updateButtonStates();
+
+  // Restore BPM display
+  connection.elements.bpmDisplay.style.display = '';
+
   connection.elements.viewerHeader.style.display    = 'none';
   connection.elements.minimapWrap.style.display     = 'none';
   connection.elements.minimapLabelRight.textContent = '';

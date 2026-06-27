@@ -72,6 +72,7 @@ function createDevicePanel() {
   bpmDisplay.appendChild(heartIcon);
   bpmDisplay.appendChild(bpmText);
   overlayTop.appendChild(bpmDisplay);
+
   overlay.appendChild(overlayTop);
 
   // ── Top-right group: info | fullscreen | theme | disconnect ───────────────
@@ -356,6 +357,7 @@ function createDevicePanel() {
 
     // DOM element refs used by other modules (recording.js, connection.js, recording-viewer.js)
     elements: {
+      bpmDisplay,
       bpmText,
       heartIcon,
       recordingTimer,
@@ -415,9 +417,11 @@ function createDevicePanel() {
   // ════════════════════════════════════════════════════════════
   connectToggleBtn.addEventListener("click", () => {
     if (!connection.connected) {
-      connectBLE();          // connection.js
+      connectBLE();
+    } else if (connection.viewerActive) {
+      closeRecordingViewer();  // exits viewer and restarts live stream
     } else {
-      toggleDisplayPause();  // connection.js
+      toggleDisplayPause();
     }
   });
 
@@ -479,12 +483,12 @@ function updateButtonStates() {
   // Connect / play-pause button icons
   const connectToggleBtn = document.querySelector('.btn-connect-center');
   if (connectToggleBtn) {
-    connectToggleBtn.querySelector('.icon-connect').style.display = (!isConn)             ? 'block' : 'none';
-    connectToggleBtn.querySelector('.icon-pause').style.display   = (isConn && !isPaused) ? 'block' : 'none';
-    connectToggleBtn.querySelector('.icon-play').style.display    = (isConn && isPaused)  ? 'block' : 'none';
-    connectToggleBtn.setAttribute('aria-label', !isConn ? 'Connect' : isPaused ? 'Resume display' : 'Pause display');
-    connectToggleBtn.title = !isConn ? 'Connect' : isPaused ? 'Resume' : 'Pause';
-    connectToggleBtn.disabled = isRec || isViewer || !!connection._streamBusy;
+    connectToggleBtn.querySelector('.icon-connect').style.display = (!isConn)                          ? 'block' : 'none';
+    connectToggleBtn.querySelector('.icon-pause').style.display   = (isConn && !isPaused && !isViewer) ? 'block' : 'none';
+    connectToggleBtn.querySelector('.icon-play').style.display    = (isConn && (isPaused || isViewer)) ? 'block' : 'none';
+    connectToggleBtn.setAttribute('aria-label', !isConn ? 'Connect' : (isViewer || isPaused) ? 'Resume' : 'Pause display');
+    connectToggleBtn.title = !isConn ? 'Connect' : isViewer ? 'Exit viewer & resume' : isPaused ? 'Resume' : 'Pause';
+    connectToggleBtn.disabled = isRec || !!connection._streamBusy;
   }
 
   // Disconnect button

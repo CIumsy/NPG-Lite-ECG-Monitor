@@ -309,7 +309,7 @@ canvas {
 /* === Recording viewer header === */
 .viewer-header {
   position: absolute;
-  top: 4rem;
+  top: 1rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -920,8 +920,7 @@ canvas {
   .btn-connect-center svg,
   .btn-connect-center img          { width: 1.625rem; height: 1.625rem; }
 
-  /* Viewer header: below BPM (BPM top 1rem + height 2rem = 3rem, add gap) */
-  .viewer-header { top: 3.5rem; }
+  .viewer-header { top: 1rem; }
 
   /* Recording timer + minimap: above tallest button (0.875 + 3.25 + 0.75 = 4.875rem) */
   .recording-timer { bottom: 4.875rem; font-size: 0.82rem; }
@@ -1021,8 +1020,7 @@ canvas {
   .recordings-dropup.timer-active { bottom: 6.5rem; }
   .minimap-wrap    { bottom: 4.25rem; height: 2.25rem; }
 
-  /* BPM(top 0.5 + height 2 = 2.5rem) + gap → viewer header */
-  .viewer-header   { top: 3rem; padding: 0.25rem 0.5rem 0.25rem 0.625rem; gap: 0.375rem; }
+  .viewer-header   { top: 0.5rem; padding: 0.25rem 0.5rem 0.25rem 0.625rem; gap: 0.375rem; }
   .viewer-filename { font-size: 0.72rem; }
   .viewer-duration { font-size: 0.66rem; }
 }
