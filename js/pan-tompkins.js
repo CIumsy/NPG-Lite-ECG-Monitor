@@ -1,25 +1,12 @@
-// Pan-Tompkins QRS / R-peak detector — adapted for 500 Hz
-//
-// Original algorithm: Pan & Tompkins (1985), "A Real-Time QRS Detection Algorithm"
-// This implementation mirrors the NPG-Lite firmware logic, with all timing constants
-// scaled by 4× (500 Hz / 125 Hz reference rate) so sample counts are equivalent.
-//
-// Key stages:
-//   1. 5-point symmetric derivative  → slope signal
-//   2. Squaring                       → emphasise peaks, suppress sign
-//   3. Moving Window Integrator (MWI) → smooth energy envelope
-//   4. Adaptive dual-threshold        → SPKI / NPKI with learning phase
-//   5. Refractory period + T-wave rejection
-//   6. Searchback for missed beats
-//   7. R-peak localisation in raw ECG history
-//   8. BPM tracking via 8-beat RR average
+// Pan-Tompkins R-peak detector (Pan & Tompkins 1985), adapted for 500 Hz.
+// Timing constants are scaled 4× from the original 125 Hz reference rate.
 
 class PanTompkinsDetector {
   constructor(fs) {
     this.fs = fs;
     const s = fs / 125;                          // scale factor = 4 at 500 Hz
 
-    // ── Timing constants (samples) ──────────────────────────────────────────
+    // timing constants (samples)
     this.MWI_WIN  = Math.round(20 * s);          // 80  samples  (~160 ms)
     this.REFRACT  = Math.round(25 * s);          // 100 samples  (~200 ms)
     this.LEARN_N  = fs * 2;                      // 1000 samples (2 s fast calibration)
@@ -34,60 +21,60 @@ class PanTompkinsDetector {
     this.DECAY_SPKI      = 0.50;
     this.ECG_HIST_LEN    = Math.round(240 * s);  // 960 samples  — ECG history for R localisation
 
-    // ── ECG circular history (for R-peak localisation) ──────────────────────
+    // ECG circular history (for R-peak localisation)
     this.ecgHist  = new Float64Array(this.ECG_HIST_LEN);
     this.slopeHist = new Float64Array(this.ECG_HIST_LEN);
     this.ecgTime  = new Uint32Array(this.ECG_HIST_LEN);
     this.ecgW     = 0;
 
-    // ── 5-point derivative ring buffer ──────────────────────────────────────
+    // 5-point derivative buffer
     this.dBuf = new Float64Array(5);
     this.dW   = 0;
 
-    // ── Moving Window Integrator ─────────────────────────────────────────────
+    // moving window integrator
     this.mwiBuf = new Float64Array(this.MWI_WIN);
     this.mwiW   = 0;
     this.mwiSum = 0;
 
-    // ── 3-point MWI peak tracker ─────────────────────────────────────────────
+    // MWI peak tracker state
     this.m0 = 0; this.t0 = 0;
     this.m1 = 0; this.t1 = 0;
     this.m2 = 0; this.t2 = 0;
 
-    // ── Adaptive thresholds ──────────────────────────────────────────────────
+    // adaptive thresholds
     this.SPKI = 0; this.NPKI = 0;
     this.TH1  = 0; this.TH2  = 0;
 
-    // ── QRS state ────────────────────────────────────────────────────────────
+    // QRS state
     this.lastQRS      = 0;
     this.lastQRSSlope = 0;
 
-    // ── RR interval history (8 beats for rrAvg) ──────────────────────────────
+    // RR interval history
     this.rrBuf = new Float64Array(8);
     this.rrW   = 0; this.rrN = 0;
     this.rrAvg = fs; // initialise to 1 s
 
-    // ── Searchback candidate ─────────────────────────────────────────────────
+    // searchback state
     this.sbPeakVal  = 0;
     this.sbPeakTime = 0;
 
-    // ── Learning phase accumulators ──────────────────────────────────────────
+    // learning phase state
     this.learnCount = 0;
     this.learnMax   = 0;
     this.learnSum   = 0;
 
-    // ── Watchdog noise baseline ───────────────────────────────────────────────
+    // watchdog state
     this.mwBaseInit = false;
     this.mwBase     = 0;
     this.lastRecover = 0;
 
-    // ── BPM tracking (8-beat RR rolling average, separate from rrBuf above) ──
+    // BPM history (separate 8-beat rolling average)
     this.bpmHist = new Float64Array(8);
     this.bpmHW   = 0; this.bpmHN = 0;
     this.bpm     = 0;
     this.lastRTime = 0;
 
-    // ── Absolute sample counter ───────────────────────────────────────────────
+    // absolute sample counter
     this.n = 0;
   }
 
@@ -107,7 +94,7 @@ class PanTompkinsDetector {
     this.n = 0;
   }
 
-  // ── Private: 5-point symmetric derivative ────────────────────────────────
+  // 5-point symmetric derivative
   _deriv5(x) {
     this.dBuf[this.dW] = x;
     this.dW = (this.dW + 1) % 5;
@@ -119,7 +106,7 @@ class PanTompkinsDetector {
     return (-xn2 - 2 * xn1 + 2 * xp1 + xp2) / 8.0;
   }
 
-  // ── Private: Moving Window Integrator (O(1) circular buffer) ─────────────
+  // moving window integrator — O(1) circular buffer
   _mwi(x) {
     this.mwiSum -= this.mwiBuf[this.mwiW];
     this.mwiBuf[this.mwiW] = x;
@@ -128,7 +115,7 @@ class PanTompkinsDetector {
     return this.mwiSum / this.MWI_WIN;
   }
 
-  // ── Private: update 8-beat RR average ────────────────────────────────────
+  // update 8-beat RR average
   _rrUpdate(rr) {
     this.rrBuf[this.rrW] = rr;
     this.rrW = (this.rrW + 1) & 7;
@@ -138,7 +125,7 @@ class PanTompkinsDetector {
     this.rrAvg = s / this.rrN;
   }
 
-  // ── Private: update 8-beat BPM rolling average ───────────────────────────
+  // update 8-beat BPM rolling average
   _bpmUpdate(rTime) {
     if (this.lastRTime === 0) { this.lastRTime = rTime; return; }
     const rr = rTime - this.lastRTime;
@@ -152,9 +139,7 @@ class PanTompkinsDetector {
     this.bpm = (60 * this.fs) / (sum / this.bpmHN);
   }
 
-  // ── Coefficient of variation of recent RR intervals ───────────────────────
-  // Real ECG: CV typically < 0.15.  Random noise: CV > 0.30.
-  // Returns 1.0 (treated as "bad") until at least 4 intervals are recorded.
+  // RR coefficient of variation — real ECG < 0.15, noise > 0.30; returns 1.0 until 4 intervals seen
   _rrCV() {
     if (this.bpmHN < 4) return 1.0;
     let sum = 0;
@@ -169,7 +154,7 @@ class PanTompkinsDetector {
     return Math.sqrt(sumSq / this.bpmHN) / mean;
   }
 
-  // ── Private: best slope in a window around a time point ──────────────────
+  // best slope in a window around a time point
   _slopeAround(timeCenter, halfWin) {
     let best = 0;
     for (let k = 0; k < this.ECG_HIST_LEN; k++) {
@@ -182,9 +167,7 @@ class PanTompkinsDetector {
     return best;
   }
 
-  // ── Private: find the true R-peak location near an MWI-detected QRS time ─
-  // Searches for the maximum POSITIVE value; R-peaks are always the tallest
-  // positive deflection for standard ECG lead placement.
+  // find the true R-peak location near an MWI-detected QRS time
   _findRpeak(qrsTime) {
     let bestVal = -Infinity, bestSlope = -1, bestTime = 0;
     for (let k = 0; k < this.ECG_HIST_LEN; k++) {
@@ -201,13 +184,13 @@ class PanTompkinsDetector {
     return bestTime > 0 ? bestTime : null;
   }
 
-  // ── Private: recalculate both thresholds from SPKI / NPKI ────────────────
+  // recalculate both thresholds from SPKI / NPKI
   _updateTH() {
     this.TH1 = this.NPKI + 0.25 * (this.SPKI - this.NPKI);
     this.TH2 = 0.40 * this.TH1;
   }
 
-  // ── Private: validate a QRS candidate (refractory + T-wave + RR checks) ──
+  // validate a QRS candidate (refractory, T-wave, and RR checks)
   _acceptQRS(peakTime) {
     if (this.lastQRS !== 0) {
       const dt = peakTime - this.lastQRS;
@@ -223,7 +206,7 @@ class PanTompkinsDetector {
     return true;
   }
 
-  // ── Private: watchdog — decays SPKI when no QRS detected for too long ────
+  // watchdog — decays SPKI when no QRS detected for too long
   _watchdog() {
     if (this.n < this.LEARN_N || this.lastQRS === 0) return;
     let blindLimit = Math.floor(1.5 * this.rrAvg);
@@ -239,8 +222,7 @@ class PanTompkinsDetector {
     this.sbPeakVal = 0; this.sbPeakTime = 0;
   }
 
-  // ── Private: process an MWI local maximum as a QRS candidate ─────────────
-  // Returns sample-time of the R-peak if accepted, otherwise null.
+  // process an MWI local maximum as a QRS candidate; returns R-peak sample-time or null
   _handleMWIPeak(peakVal, peakTime) {
     if (this.n < this.LEARN_N) {
       this.learnCount++;
@@ -281,7 +263,7 @@ class PanTompkinsDetector {
     return rTime;
   }
 
-  // ── Private: searchback — recover a missed beat after 1.66× rrAvg silence ─
+  // searchback — recover a missed beat after 1.66× rrAvg silence
   _searchback() {
     if (this.n < this.LEARN_N || this.lastQRS === 0) return null;
     if ((this.n - this.lastQRS) <= 1.66 * this.rrAvg) return null;
@@ -305,7 +287,7 @@ class PanTompkinsDetector {
     return null;
   }
 
-  // ── Public: feed one filtered ECG sample ─────────────────────────────────
+  // feed one filtered ECG sample; returns R-peak sample-time or null
   // Returns the absolute sample-time of an R-peak when one is detected, or null.
   process(ecgSample) {
     const n     = this.n;

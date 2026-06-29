@@ -1,23 +1,10 @@
-// Per-sample signal processing pipeline
-//
-// Called once for every parsed sample from packet-parser.js.
-// The pipeline in order:
-//
-//   1. Dropped-packet detection  — compares sample counter to expected value
-//   2. ADC normalization         — rawADC → float in [-1, +1]  (via packet-parser.js)
-//   3. Signal Quality Index      — EMA of pre-filter power; detects flat-line / no electrodes
-//   4. Flat-line reset           — recalibrates all filters if signal was absent > 500 ms
-//   5. DC filter (optional)      — high-pass 0.5 Hz, removes baseline wander
-//   6. Notch filter              — band-stop 48-52 Hz, removes powerline interference
-//   7. ECG low-pass filter       — 30 Hz cutoff, smooths noise above QRS band
-//   8. Pan-Tompkins detector     — R-peak detection; stores flag in peakFlags[]
-//   9. Recording                 — appends filtered sample if recording is active
+// Per-sample signal processing — filters, SQI, and Pan-Tompkins peak detection.
 
 function processSample(dataView) {
   if (dataView.byteLength !== connection.singleSampleLen) return;
   connection._samplesThisSecond++;
 
-  // ── 1. Dropped-packet detection ──────────────────────────────────────────
+  // 1. dropped-packet detection
   const sampleCounter = dataView.getUint8(0);
   if (connection.prevSampleCounter === null) {
     connection.prevSampleCounter = sampleCounter;
@@ -31,23 +18,19 @@ function processSample(dataView) {
     connection.prevSampleCounter = sampleCounter;
   }
 
-  // ── 2. ADC normalization ─────────────────────────────────────────────────
+  // 2. normalize ADC value
   const writePos = connection.sampleIndex;
   connection.peakFlags[writePos] = 0; // clear stale peak flag for this slot
 
   const rawCh0 = dataView.getInt16(1, false); // big-endian
   let normCh0  = normalizeSample(Math.max(0, Math.min(4096, rawCh0)));
 
-  // ── 3. Signal Quality Index (SQI) ────────────────────────────────────────
-  // EMA of pre-filter signal power; drops to ~0 when electrodes are off or flatlined.
+  // 3. signal quality — EMA of pre-filter power; drops near 0 when electrodes are off
   const wasGood = connection.signalGood;
   connection._sqiPower = 0.999 * connection._sqiPower + 0.001 * normCh0 * normCh0;
   connection.signalGood = connection._sqiPower > SQI_FLAT_THRESHOLD;
 
-  // ── 4. Flat-line reset ───────────────────────────────────────────────────
-  // If signal was absent for > 500 ms (250 samples) and has just returned,
-  // recalibrate all filters and the detector from scratch so the learning
-  // phase re-runs cleanly instead of inheriting a corrupted state.
+  // 4. if signal returns after >500 ms flatline, reset all filters so they re-calibrate cleanly
   if (!connection.signalGood) {
     if (connection._flatlineSamples < 65535) connection._flatlineSamples++;
   } else {
@@ -63,14 +46,14 @@ function processSample(dataView) {
     connection._flatlineSamples = 0;
   }
 
-  // ── 5-7. Filter chain ────────────────────────────────────────────────────
+  // 5–7. filter chain
   if (connection.dcEnabled) normCh0 = connection.dc0.process(normCh0);
   normCh0 = connection.ecg0.process(connection.notch0.process(normCh0));
 
   connection.dataCh0[writePos] = normCh0;
   connection.sampleIndex = (connection.sampleIndex + 1) % NUM_POINTS;
 
-  // ── 8. Pan-Tompkins R-peak detection ─────────────────────────────────────
+  // 8. R-peak detection
   const rTime = connection.panTompkins.process(normCh0);
 
   // RR-interval coefficient of variation distinguishes real ECG (regular
@@ -84,7 +67,7 @@ function processSample(dataView) {
   }
   connection.absN++;
 
-  // ── 9. Recording ─────────────────────────────────────────────────────────
+  // 9. append to recording if active
   if (connection.isRecording) {
     connection.recordingData.push([sampleCounter, normCh0]);
     connection.totalRecordedSamples++;

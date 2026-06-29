@@ -1,22 +1,4 @@
-// ECG recording — start, stop, flush, and delete recordings
-//
-// Storage backend: IndexedDB
-//   Database name : 'ECGRecordings'  (version 3)
-//   Object stores :
-//     'ECGBatches'    — current append-only batch store
-//                       key: 'filename|00000000' (batch index zero-padded to 8 digits)
-//                       Avoids O(N) read-modify-write; each flush is an independent put().
-//     'ECGRecordings' — legacy single-record store (kept for backward compatibility only)
-//
-// Each recorded sample is stored as [sampleCounter (uint8), normalizedCH0 (float32)].
-// Batches of 500 samples are flushed to IndexedDB asynchronously.
-// Writes are serialised through _writeQueue so concurrent flushes cannot race.
-//
-// Minimum recording duration: MIN_RECORDING_MS (12 s).
-// Recordings shorter than this are silently discarded on stop.
-//
-// UI updates (toast, dropup, button states, timer) are delegated to button-ui.js
-// via the globally defined showToast(), refreshDropup(), and updateButtonStates().
+// ECG recording — start, stop, flush batches to IndexedDB, and delete recordings.
 
 // Open (and cache) the IndexedDB connection.
 async function openRecordingDB() {

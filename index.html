@@ -9,10 +9,10 @@
 </head>
 
 <body>
-  <!-- Fullscreen display container — populated by button-ui.js → createDevicePanel() -->
+  <!-- main display container, built by createDevicePanel() -->
   <div id="deviceContainer"></div>
 
-  <!-- Theme toggle button (hidden — theme is toggled via the overlay button) -->
+  <!-- hidden theme toggle (switched via the overlay button inside the canvas) -->
   <button class="theme-toggle" aria-label="Toggle theme" style="display:none">
     <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="4"/>
@@ -26,21 +26,7 @@
     </svg>
   </button>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════
-       Script load order — each file depends only on files above it:
-
-       1. webglplot      — third-party WebGL plot library (no dependencies)
-       2. config         — shared constants (NUM_POINTS, SAMPLE_RATE, UUIDs …)
-       3. filters/*      — IIR filter classes  (depend on nothing)
-       4. pan-tompkins   — QRS detector class  (depend on nothing)
-       5. packet-parser  — byte extraction + handleNotification  (uses connection global)
-       6. signal-processor — per-sample pipeline (uses filters, pan-tompkins, connection)
-       7. connection     — BLE connect/disconnect/stream  (uses signal-processor globals)
-       8. recording      — IndexedDB start/stop/flush  (uses connection, button-ui globals)
-       9. realtime-plot  — WebGL init + animate loop  (uses connection, webglplot)
-      10. recording-viewer — viewer open/close, minimap, scrub  (uses realtime-plot, connection)
-      11. button-ui      — DOM build, event wiring, UI helpers  (uses everything above)
-       ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- script load order matters — each file depends on those above it -->
 
   <!-- Third-party -->
   <script src="webglplot.umd.js"></script>
@@ -56,7 +42,7 @@
   <!-- Signal processing: QRS detection -->
   <script src="js/pan-tompkins.js"></script>
 
-  <!-- Data path: parsing → pipeline → BLE transport -->
+  <!-- data path -->
   <script src="js/packet-parser.js"></script>
   <script src="js/signal-processor.js"></script>
   <script src="js/connection.js"></script>

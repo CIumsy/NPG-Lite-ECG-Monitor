@@ -1,12 +1,8 @@
-// High-Pass (DC-Removal) Butterworth IIR digital filter
-// Sampling rate : 500 Hz
-// Cutoff        : 0.5 Hz  (removes baseline wander and DC offset)
-// Order         : 2  (single second-order section / biquad)
-// Toggleable    : user can disable via the DC-filter button in the UI
-//
-// Coefficients generated with SciPy butter() + BioAmp Filter Designer:
-//   https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
-//   https://github.com/upsidedownlabs/BioAmp-Filter-Designer
+// High-Pass Butterworth IIR digital filter
+// Sampling rate: 500.0 Hz, frequency: 0.5 Hz
+// Filter is order 2, implemented as second-order sections (biquads)
+// Reference: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
+// Reference: https://github.com/upsidedownlabs/BioAmp-Filter-Designer
 
 class DCFilter {
   constructor() {

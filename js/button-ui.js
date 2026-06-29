@@ -1,32 +1,11 @@
-// UI layer — DOM construction, button wiring, and display helpers
-//
-// Responsibilities:
-//   - createDevicePanel()  : builds the full UI DOM tree, initialises the
-//                            global `connection` state object, starts the
-//                            animation loop and BPM update interval
-//   - updateButtonStates() : syncs every button's enabled/icon/label state
-//                            to the current connection flags
-//   - showToast()          : brief save-confirmation popup above the recordings button
-//   - refreshDropup()      : rebuilds the recordings list dropup
-//   - togglePeaks()        : shows/hides R-peak markers on both live and viewer plots
-//   - toggleDCFilter()     : enables/disables the DC (baseline-wander) filter
-//   - triggerHeartbeat()   : flashes the heart icon on each detected R-peak
-//   - updateBPMDisplay()   : writes the current BPM value into the header text
-//   - resetBPMDisplay()    : resets BPM text to "-- BPM" (called on disconnect/stop)
-//   - toggleTheme()        : switches dark ↔ light, persists to localStorage,
-//                            repaints WebGL colours, grid, and minimap
-//
-// All other modules call the global functions above.
-// DOM element references needed by other modules are stored on connection.elements.
+// Builds the UI and wires up all buttons, display helpers, and event listeners.
 
 // Global connection state — populated by createDevicePanel(), referenced by all modules.
 let connection = null;
 
 function createDevicePanel() {
 
-  // ════════════════════════════════════════════════════════════
-  // 1. BUILD DOM
-  // ════════════════════════════════════════════════════════════
+  // build DOM
 
   // Root canvas container (fills the viewport)
   const canvasContainer = document.createElement("div");
@@ -39,7 +18,7 @@ function createDevicePanel() {
   const overlay = document.createElement("div");
   overlay.classList.add("canvas-overlay");
 
-  // ── UDL logo (top-left, theme-aware) ─────────────────────────────────────
+  // logo
   const udlLogo = document.createElement("a");
   udlLogo.classList.add("udl-logo");
   udlLogo.href = "#";
@@ -50,7 +29,7 @@ function createDevicePanel() {
     <img class="logo-light-mobile" src="icons/udl_logo_black_mobile.svg"  alt="Upside Down Labs">`;
   overlay.appendChild(udlLogo);
 
-  // ── BPM display (top-center) ──────────────────────────────────────────────
+  // BPM display
   const overlayTop = document.createElement("div");
   overlayTop.classList.add("overlay-top");
 
@@ -73,7 +52,7 @@ function createDevicePanel() {
 
   overlay.appendChild(overlayTop);
 
-  // ── Top-right group: info | fullscreen | theme | disconnect ───────────────
+  // top-right buttons
   const bottomRightGroup = document.createElement("div");
   bottomRightGroup.classList.add("bottom-right-group");
 
@@ -157,7 +136,7 @@ function createDevicePanel() {
   bottomRightGroup.appendChild(disconnectBtn);
   overlay.appendChild(bottomRightGroup);
 
-  // ── Bottom controls bar ───────────────────────────────────────────────────
+  // bottom controls
   const controlsOverlay = document.createElement("div");
   controlsOverlay.classList.add("controls-overlay");
 
@@ -245,14 +224,14 @@ function createDevicePanel() {
   controlsOverlay.appendChild(recToast);
   overlay.appendChild(controlsOverlay);
 
-  // ── Recording timer pill (above controls) ────────────────────────────────
+  // recording timer pill
   const recordingTimer = document.createElement("div");
   recordingTimer.classList.add("recording-timer");
   recordingTimer.style.display = "none";
   recordingTimer.innerHTML = '<div class="recording-dot"></div><span>00:00:00</span>';
   overlay.appendChild(recordingTimer);
 
-  // ── Recording viewer header ───────────────────────────────────────────────
+  // viewer header (shown when viewing a recording)
   const viewerHeader = document.createElement('div');
   viewerHeader.classList.add('viewer-header');
   viewerHeader.style.display = 'none';
@@ -277,7 +256,7 @@ function createDevicePanel() {
   viewerHeader.append(viewerFilenameEl, viewerDurationEl, viewerDownloadBtn, viewerCloseBtn);
   overlay.appendChild(viewerHeader);
 
-  // ── Minimap scrubber ──────────────────────────────────────────────────────
+  // minimap scrubber
   const minimapWrap     = document.createElement("div");
   minimapWrap.classList.add("minimap-wrap");
   const minimapTrack    = document.createElement("div");
@@ -301,9 +280,7 @@ function createDevicePanel() {
   canvasContainer.appendChild(overlay);
   document.getElementById("deviceContainer").appendChild(canvasContainer);
 
-  // ════════════════════════════════════════════════════════════
-  // 2. INITIALISE GLOBAL CONNECTION STATE
-  // ════════════════════════════════════════════════════════════
+  // init connection state
   connection = {
     // BLE device handles
     device: null, server: null, controlChar: null, dataChar: null,
@@ -374,9 +351,7 @@ function createDevicePanel() {
     },
   };
 
-  // ════════════════════════════════════════════════════════════
-  // 3. CANVAS SIZING + RESIZE OBSERVER
-  // ════════════════════════════════════════════════════════════
+  // canvas sizing and resize handler
   const dpr = window.devicePixelRatio || 1;
   canvas.width  = Math.round(window.innerWidth  * dpr);
   canvas.height = Math.round(window.innerHeight * dpr);
@@ -399,9 +374,7 @@ function createDevicePanel() {
   });
   resizeObserver.observe(canvasContainer);
 
-  // ════════════════════════════════════════════════════════════
-  // 4. INIT WEBGL PLOT, ANIMATION, BPM INTERVAL
-  // ════════════════════════════════════════════════════════════
+  // start WebGL plot, animation loop, and BPM interval
   initPlot(canvas);   // realtime-plot.js
   drawGrid();         // realtime-plot.js
   animate();          // realtime-plot.js
@@ -410,9 +383,7 @@ function createDevicePanel() {
   // (AAMI EC13 / IEC 60601-2-27 standard smoothing); no extra windowing needed.
   setInterval(() => updateBPMDisplay(computeBPM()), 1000);
 
-  // ════════════════════════════════════════════════════════════
-  // 5. WIRE UP BUTTON EVENTS
-  // ════════════════════════════════════════════════════════════
+  // button event listeners
   connectToggleBtn.addEventListener("click", () => {
     if (!connection.connected) {
       connectBLE();
@@ -446,9 +417,7 @@ function createDevicePanel() {
   updateButtonStates();
   loadRecordingsFromDB(); // recording.js — restore persisted recordings on page load
 
-  // ════════════════════════════════════════════════════════════
-  // 6. FULLSCREEN HELPER (local — only needs canvasContainer)
-  // ════════════════════════════════════════════════════════════
+  // fullscreen toggle
   async function toggleFullscreen() {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(err => console.error("Error exiting fullscreen:", err));
@@ -464,10 +433,6 @@ function createDevicePanel() {
     }
   }
 }
-
-// ════════════════════════════════════════════════════════════
-// GLOBAL UI HELPERS  (called by connection.js, recording.js, signal-processor.js)
-// ════════════════════════════════════════════════════════════
 
 // Sync every button's enabled/icon/label to the current connection flags.
 function updateButtonStates() {
@@ -682,9 +647,6 @@ function toggleDCFilter() {
   });
 }
 
-// ════════════════════════════════════════════════════════════
-// THEME TOGGLE  (also called by the overlay button inside createDevicePanel)
-// ════════════════════════════════════════════════════════════
 function toggleTheme() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   if (isLight) {

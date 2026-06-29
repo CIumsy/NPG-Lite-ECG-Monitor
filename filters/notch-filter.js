@@ -1,11 +1,8 @@
-// Band-Stop (Notch) Butterworth IIR digital filter
-// Sampling rate : 500 Hz
-// Stop band     : 48 – 52 Hz  (removes 50 Hz powerline interference)
-// Order         : 2  (two cascaded second-order sections / biquads)
-//
-// Coefficients generated with SciPy butter() + BioAmp Filter Designer:
-//   https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
-//   https://github.com/upsidedownlabs/BioAmp-Filter-Designer
+// Band-Stop Butterworth IIR digital filter
+// Sampling rate: 500.0 Hz, frequency: [48.0, 52.0] Hz
+// Filter is order 2, implemented as second-order sections (biquads)
+// Reference: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
+// Reference: https://github.com/upsidedownlabs/BioAmp-Filter-Designer
 
 class NotchFilter {
   constructor() {

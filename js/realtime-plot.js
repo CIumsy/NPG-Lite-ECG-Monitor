@@ -1,17 +1,4 @@
-// Real-time ECG rendering
-//
-// Responsibilities:
-//   - Initialize the WebglPlot instance and the two WebGL lines
-//       line0     : ECG waveform (green dark / blue light — IEC 60601-1-8 cardiac monitor colour)
-//       peakLine  : R-peak markers (red, ⊓-shaped, ±PEAK_HALF_WIDTH samples wide)
-//   - Run the requestAnimationFrame animation loop
-//       • Draws the ECG waveform from the circular buffer with a 24-sample sweep gap
-//       • Overlays ⊓-shaped R-peak markers from peakFlags[]
-//       • When viewerActive or displayPaused: keeps the current frame alive without re-drawing
-//   - Draw the ECG paper grid (CSS repeating-linear-gradient, recomputed on resize)
-//   - Apply theme-aware colours (dark = green/red, light = blue/deep-red)
-//
-// Called by button-ui.js during createDevicePanel() and by the ResizeObserver.
+// Real-time ECG rendering — WebGL plot, animation loop, grid, and theme colours.
 
 // Destructure from the UMD bundle at file scope so all functions below can use these directly.
 // webglplot.umd.js is loaded before this file so WebglPlotBundle is already defined.
@@ -22,8 +9,6 @@ const GAP_WIDTH       = 24;  // blank samples ahead of write head (~48 ms sweep 
 
 // Reused scratch buffer for building peak marker shapes each frame (avoids allocation)
 let _peakDisplay = null; // Float32Array(NUM_POINTS), allocated in initPlot()
-
-// ── Theme-aware colour helpers ────────────────────────────────────────────────
 
 function getLineColor() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
@@ -49,11 +34,7 @@ function applyThemeColors() {
   }
 }
 
-// ── ECG paper grid ────────────────────────────────────────────────────────────
-// Standard clinical layout: small square = 0.04 s (20 samples @ 500 Hz),
-// large square = 0.20 s (5 small squares).  Both axes use the same pixel size
-// so cells are square on screen.  Recomputed on every container resize.
-
+// ECG paper grid — small square = 0.04 s, large = 0.20 s. Recomputed on resize.
 function drawGrid() {
   const cont = connection && connection.elements ? connection.elements.canvasContainer : null;
   if (!cont) return;
@@ -72,8 +53,6 @@ function drawGrid() {
     `repeating-linear-gradient(to bottom, ${minor} 0, ${minor} 1px, transparent 1px, transparent ${sm}px)`,
   ].join(', ');
 }
-
-// ── WebGL initialisation ──────────────────────────────────────────────────────
 
 function initPlot(canvas) {
   _peakDisplay = new Float32Array(NUM_POINTS);
@@ -95,11 +74,7 @@ function initPlot(canvas) {
   connection.wglp.addLine(connection.peakLine);
 }
 
-// ── Animation loop ────────────────────────────────────────────────────────────
-// Runs at the display's refresh rate (~60 Hz).
-// When viewerActive or displayPaused, just calls wglp.update() to keep the
-// last rendered frame alive without rebuilding it.
-
+// Animation loop — runs at ~60 Hz; holds the last frame when paused or viewer is open.
 function animate() {
   requestAnimationFrame(animate);
   if (!connection || !connection.dataCh0) return;

@@ -1,27 +1,6 @@
-// Recording viewer — playback of saved ECG recordings
-//
-// Responsibilities:
-//   - Load a saved recording from IndexedDB (batch store + legacy fallback)
-//   - Re-run Pan-Tompkins offline on the loaded samples to detect R-peaks
-//   - Render the recording into the WebGL lines (renderViewerFrame)
-//   - Draw the compressed minimap overview canvas
-//   - Position the minimap viewport indicator
-//   - Handle all scrubbing interactions:
-//       keyboard arrow keys  (±0.5 s per step)
-//       mouse wheel / 2-finger trackpad
-//       minimap viewport drag
-//       minimap track click-to-jump + drag
-//       canvas touch swipe
-//   - Download a recording as CSV (assembles batches in order)
-//   - Close the viewer and optionally restart live stream
-//
-// DOM element references are read from connection.elements (set by button-ui.js).
-// renderViewerFrame() and drawMinimap() are called directly from button-ui.js
-// (togglePeaks) and from realtime-plot.js (applyThemeColors → _redrawMinimap).
+// Recording viewer — loads, renders, and scrubs saved ECG recordings.
 
 const STEP_SAMPLES = Math.round(SAMPLE_RATE * 0.5); // 0.5 s per arrow/wheel step
-
-// ── Viewer rendering ──────────────────────────────────────────────────────────
 
 // Write the current viewer window into the two WebGL lines.
 function renderViewerFrame() {
@@ -62,8 +41,6 @@ function renderViewerFrame() {
   }
   connection.wglp.update();
 }
-
-// ── Minimap ───────────────────────────────────────────────────────────────────
 
 function _sizeMinimap() {
   const dpr    = window.devicePixelRatio || 1;
@@ -127,7 +104,6 @@ function updateMinimapViewport() {
   vport.style.left  = Math.max(0, Math.min(trackW - blockW, blockL)) + 'px';
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
 
 function shiftViewer(deltaSamples) {
   if (!connection.viewerActive || !connection.viewerData) return;
@@ -137,7 +113,6 @@ function shiftViewer(deltaSamples) {
   renderViewerFrame();
 }
 
-// ── Open / Close ──────────────────────────────────────────────────────────────
 
 async function openRecordingViewer(filename) {
   try {
@@ -248,7 +223,6 @@ function closeRecordingViewer() {
   }
 }
 
-// ── Download ──────────────────────────────────────────────────────────────────
 
 async function downloadFile(filename) {
   try {
@@ -295,7 +269,6 @@ async function downloadFile(filename) {
   }
 }
 
-// ── Scrubbing event listeners (attached after DOM is built by button-ui.js) ──
 
 function initViewerControls(canvasContainer) {
   // Keyboard: arrow keys

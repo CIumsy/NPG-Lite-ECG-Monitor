@@ -1,11 +1,8 @@
 // Low-Pass Butterworth IIR digital filter
-// Sampling rate : 500 Hz
-// Cutoff        : 30 Hz  (removes high-frequency noise above QRS band)
-// Order         : 2  (single second-order section / biquad)
-//
-// Coefficients generated with SciPy butter() + BioAmp Filter Designer:
-//   https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
-//   https://github.com/upsidedownlabs/BioAmp-Filter-Designer
+// Sampling rate: 500.0 Hz, frequency: 30.0 Hz
+// Filter is order 2, implemented as second-order sections (biquads)
+// Reference: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
+// Reference: https://github.com/upsidedownlabs/BioAmp-Filter-Designer
 
 class ECGFilter {
   constructor() {

@@ -1,18 +1,4 @@
-// BLE connection management
-//
-// Responsibilities:
-//   - Discover the NPG-Lite device via Web Bluetooth API
-//   - Establish the GATT connection with retry logic
-//   - Auto-detect 3CH / 6CH packet format from device name
-//   - Send START / STOP commands to the control characteristic
-//   - Enable / disable BLE notifications (data stream)
-//   - Manage the data-watchdog (auto-disconnect if no samples for 1 s)
-//   - Handle unexpected device disconnection (out of range, power-off)
-//   - Expose toggleDisplayPause() for the play/pause button
-//
-// Packet parsing is handled by packet-parser.js.
-// Signal processing is handled by signal-processor.js.
-// UI state updates are handled by button-ui.js (updateButtonStates, resetBPMDisplay).
+// Handles BLE connection, data streaming, and auto-disconnect logic.
 
 async function connectBLE() {
   try {

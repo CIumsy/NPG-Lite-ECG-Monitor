@@ -892,11 +892,9 @@ canvas {
   pointer-events: none;
 }
 
-/* =======================================================
-   Responsive layout
-   ======================================================= */
+/* responsive layout */
 
-/* ── Portrait phones  ≤ 600 px ──────────────────────── */
+/* portrait phones ≤ 600px */
 @media (max-width: 600px) and (orientation: portrait) {
 
   /* Logo: compact mobile variant, center = overlay-top(1rem) + bpm-height(2rem)/2 = 2rem */
@@ -989,7 +987,7 @@ canvas {
   .info-panel { right: 0; left: auto; min-width: 10rem; }
 }
 
-/* ── Extra-small phones  ≤ 360 px ───────────────────── */
+/* extra-small phones ≤ 360px */
 @media (max-width: 360px) and (orientation: portrait) {
   /* Shrink top-group on very narrow screens so it doesn't crowd BPM */
   .bottom-right-group { gap: 0.125rem; }
@@ -1024,7 +1022,7 @@ canvas {
   .viewer-close-btn { width: 1.875rem !important; }
 }
 
-/* ── Landscape phones  height ≤ 500 px ──────────────── */
+/* landscape phones */
 @media (max-height: 500px) and (orientation: landscape) {
   /* Logo center = overlay-top(0.5rem) + bpm-height(2rem)/2 = 1.5rem */
   .udl-logo     { top: 1.5rem; left: 0.625rem; }
@@ -1068,7 +1066,7 @@ canvas {
   .viewer-close-btn { width: 2rem !important; }
 }
 
-/* ── Fullscreen on phone (landscape locked, height ≤ 500 px) ── */
+/* fullscreen on phone landscape */
 @media (max-height: 500px) and (orientation: landscape) {
   /* Button sizes: slightly larger than the base landscape values */
   .canvas-container.fullscreen .btn          { width: 2.25rem; height: 2.25rem; }
@@ -1096,7 +1094,7 @@ canvas {
   .canvas-container.fullscreen .recordings-dropup.timer-active { bottom: 7rem; }
 }
 
-/* ── Tablets portrait  601 – 900 px ─────────────────── */
+/* tablets portrait 601–900px */
 @media (min-width: 601px) and (max-width: 900px) and (orientation: portrait) {
   .udl-logo img     { height: 2.625rem; }
   .btn              { width: 2.125rem; height: 2.125rem; }
