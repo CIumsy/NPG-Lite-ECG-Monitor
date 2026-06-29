@@ -39,7 +39,7 @@ async function connectBLE() {
     });
 
     // gatt.connect() can resolve before the stack is fully ready.
-    // Retry the full discovery block up to 3 times, tearing down any partial session first.
+    // Retry the full discovery block up to 3 times, resolving connection and re-connection issues.
     console.log("Connecting to GATT Server...");
     let service;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -104,7 +104,7 @@ async function disconnectBLE() {
       try { await connection.device.gatt.disconnect(); } catch (e) { /* ignore */ }
     }
   } finally {
-    // Always reset state — even if any step above threw
+    // Always reset state even if any step above threw an error
     connection.connected    = false;
     connection.streaming    = false;
     connection.displayPaused = false;

@@ -6,7 +6,7 @@
 //     Byte 0      : sample counter (uint8, wraps 0-255)
 //     Bytes 1-2   : CH0 raw ADC (int16, big-endian)
 //     Bytes 3-4   : CH1 raw ADC (int16, big-endian)
-//     Bytes 5-6   : CH2 / battery (int16, big-endian)
+//     Bytes 5-6   : CH2 raw ADC (int16, big-endian)
 //
 //   6CH device — 13 bytes per sample, 10 samples per BLE notification = 130 bytes
 //     Byte 0      : sample counter (uint8, wraps 0-255)
@@ -15,10 +15,10 @@
 // Only CH0 is used for ECG display; all other channels are ignored.
 // The packet format is auto-detected after connect from the device name (see connection.js).
 
-// Convert a raw 12-bit ADC value (0-4096) to a normalised float in [-1, +1].
+// Convert a raw 12-bit ADC value (0-4095) to a normalised float in [-1, +1].
 // The ADC midpoint (2048) maps to 0; full scale maps to ±1.
 function normalizeSample(rawADC) {
-  const ADC_MAX = 4096;
+  const ADC_MAX = 4095;
   return (rawADC - ADC_MAX / 2) * (2 / ADC_MAX);
 }
 

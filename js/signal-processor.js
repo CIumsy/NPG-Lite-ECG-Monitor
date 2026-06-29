@@ -23,7 +23,7 @@ function processSample(dataView) {
   connection.peakFlags[writePos] = 0; // clear stale peak flag for this slot
 
   const rawCh0 = dataView.getInt16(1, false); // big-endian
-  let normCh0  = normalizeSample(Math.max(0, Math.min(4096, rawCh0)));
+  let normCh0  = normalizeSample(Math.max(0, Math.min(4095, rawCh0)));
 
   // 3. signal quality — EMA of pre-filter power; drops near 0 when electrodes are off
   const wasGood = connection.signalGood;
