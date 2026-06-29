@@ -42,9 +42,7 @@ function createDevicePanel() {
   // ── UDL logo (top-left, theme-aware) ─────────────────────────────────────
   const udlLogo = document.createElement("a");
   udlLogo.classList.add("udl-logo");
-  udlLogo.href   = "https://upsidedownlabs.tech/";
-  udlLogo.target = "_blank";
-  udlLogo.rel    = "noopener noreferrer";
+  udlLogo.href = "#";
   udlLogo.innerHTML = `
     <img class="logo-dark"         src="icons/udl_logo_white.svg"         alt="Upside Down Labs">
     <img class="logo-light"        src="icons/udl_logo_black.svg"         alt="Upside Down Labs">
