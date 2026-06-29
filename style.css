@@ -656,7 +656,6 @@ canvas {
   max-width: 18.75rem;
   background: var(--popup-bg);
   border: 1px solid var(--btn-border);
-  border-left: 3px solid #2ecc71;
   border-radius: 0.625rem;
   padding: 0.625rem 0.875rem;
   color: var(--btn-text);
@@ -682,7 +681,7 @@ canvas {
 }
 
 .rec-toast strong {
-  color: #2ecc71;
+  color: var(--btn-text);
   display: block;
   margin-bottom: 0.125rem;
   font-size: 0.88rem;
