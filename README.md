@@ -6,6 +6,7 @@ A web-based ECG monitor for Neuro Playground Lite. Works on Windows, Mac, Linux 
 
 - Any Chromium-based browser: Chrome, Brave, Edge, etc. (Firefox does not support Web Bluetooth)
 - An NPG-Lite device (Explorer, Ninja or Beast pack)
+- NPG-Lite-BLE firmware flashed on the device. You can flash it using [NPG-Lite-Flasher-Web](https://upsidedownlabs.github.io/NPG-Lite-Flasher-Web/)
 
 ## How to use
 
