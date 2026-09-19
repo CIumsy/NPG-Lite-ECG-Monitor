@@ -146,7 +146,7 @@ The buttons in the top right corner, from left to right:
 
 | Button | What it does |
 | --- | --- |
-| **Info (i)** | Opens a small panel with the scale of the display: the display window (4 s), the size of a large box (0.20 s) and a small box (0.040 s) of the grid, the sample rate (500 Hz), and the filters in use (50 Hz notch, 30 Hz ECG low-pass and 0.5 Hz DC removal). |
+| **Info (i)** | Opens a small panel with the scale of the display: the display window (4 s), the size of a large box (0.20 s) and a small box (0.040 s) of the grid, the sample rate (500 Hz), and the signal filters (50 Hz notch, 30 Hz ECG low-pass and 0.5 Hz DC removal). The DC removal filter is optional: it is applied by default and can be turned off by clicking the **DC filter** button at the bottom. |
 | **Fullscreen** | Toggles fullscreen mode. Press `Esc` to exit. On phones it also switches to landscape. |
 | **Theme** | Switches between light and dark mode. Your choice is remembered. |
 | **Disconnect** | Disconnects the NPG Lite. It stays disabled until a device is connected. |
